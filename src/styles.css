@@ -1,0 +1,246 @@
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f1e9;
+  color: #1c1414;
+}
+
+body,
+input,
+button {
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+button {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.vs-login-card,
+.vs-panel,
+.vs-hero {
+  box-shadow: 0 16px 40px rgba(28, 20, 20, 0.12);
+}
+
+.vs-shell--login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(145deg, #4e0c0c 0%, #8c1414 100%);
+}
+
+.vs-login-card {
+  width: min(100%, 420px);
+  padding: 34px 32px;
+  border-radius: 20px;
+  background: #f7f1e9;
+}
+
+.vs-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #c81e1e, #8c1414);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.vs-hero {
+  background: linear-gradient(135deg, #4e0c0c 0%, #8c1414 55%, #c81e1e 100%);
+  color: #f7f1e9;
+  padding: 30px 24px 34px;
+}
+
+.vs-hero-inner {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.vs-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.vs-hero-stats {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vs-stat-card {
+  min-width: 140px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.vs-stat-card strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.vs-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+}
+
+.vs-panel {
+  background: #fff;
+  border: 1px solid #d8c9b8;
+  border-radius: 16px;
+  padding: 22px;
+}
+
+.vs-panel--wide {
+  grid-column: 1 / -1;
+}
+
+.vs-section-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: #4e0c0c;
+}
+
+.vs-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d8c9b8;
+  font-size: 14px;
+  margin-bottom: 2px;
+  background: #fffdf9;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vs-input:focus {
+  outline: none;
+  border-color: #c81e1e;
+  box-shadow: 0 0 0 3px rgba(200, 30, 30, 0.14);
+}
+
+.vs-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vs-btn--primary {
+  background: linear-gradient(135deg, #c81e1e, #8c1414);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(140, 20, 20, 0.2);
+}
+
+.vs-btn--secondary {
+  background: transparent;
+  color: #f7f1e9;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.vs-btn--ghost {
+  border: 1px solid #8c1414;
+  background: transparent;
+  color: #8c1414;
+}
+
+.vs-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vs-toolbar input {
+  flex: 1 1 180px;
+}
+
+.vs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.vs-table th {
+  text-align: left;
+  color: #8c1414;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 10px 10px;
+}
+
+.vs-table td {
+  padding: 10px;
+  border-top: 1px solid #d8c9b8;
+}
+
+.vs-table tbody tr:nth-child(even) {
+  background: #fcf7f0;
+}
+
+.vs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #f5ebdc;
+  color: #4e0c0c;
+}
+
+.vs-muted {
+  opacity: 0.62;
+}
+
+@media (max-width: 720px) {
+  .vs-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .vs-hero {
+    padding: 24px 16px 28px;
+  }
+
+  .vs-panel {
+    padding: 18px;
+  }
+}
