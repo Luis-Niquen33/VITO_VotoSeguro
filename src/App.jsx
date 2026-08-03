@@ -52,6 +52,48 @@ function TallyRow({ count, color = INK, max = 60 }) {
 
 const DEFAULT_ADMIN = { id: "admin-1", usuario: "admin", clave: "VotoSeguro2026", rol: "admin", nombre: "Administrador" };
 
+function normalizeText(value) {
+  return value
+    .toString()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isPotentialDuplicate(newEntry, existing) {
+  const nameA = normalizeText(newEntry.nombre);
+  const nameB = normalizeText(existing.nombre);
+  const zoneA = normalizeText(newEntry.zona);
+  const zoneB = normalizeText(existing.zona);
+  const ageA = newEntry.edad.toString().trim();
+  const ageB = existing.edad.toString().trim();
+  const dniA = newEntry.dni.toString().trim();
+  const dniB = existing.dni.toString().trim();
+
+  if (dniA && dniB && dniA === dniB) {
+    return { type: "dni", message: "Existe un registro con el mismo DNI." };
+  }
+
+  const sameName = nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA);
+  const sameAge = ageA && ageA === ageB;
+  const sameZone = zoneA && zoneA === zoneB;
+  const similarName = nameA.startsWith(nameB) || nameB.startsWith(nameA) || nameA.split(" ").some((part) => part && nameB.includes(part));
+
+  if (sameName && (sameAge || sameZone)) {
+    return { type: "similar", message: "Existe un registro similar con mismo nombre y edad o zona." };
+  }
+  if (similarName && sameAge && sameZone) {
+    return { type: "similar", message: "El registro parece coincidir con uno existente (nombre similar, edad y zona iguales)." };
+  }
+  if (sameName && ageA === ageB) {
+    return { type: "similar", message: "El nombre y la edad son iguales a un registro existente." };
+  }
+
+  return null;
+}
+
 export default function ConteoVotoSeguro() {
   const [registros, setRegistros] = useState([]);
   const [usuarios, setUsuarios] = useState(null); // null = aún no cargado
@@ -73,6 +115,7 @@ export default function ConteoVotoSeguro() {
   const [nuevoUsuario, setNuevoUsuario] = useState("");
   const [nuevaClave, setNuevaClave] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoRol, setNuevoRol] = useState("promotor");
   const [userMsg, setUserMsg] = useState("");
 
   const loadRegistros = useCallback(async (silent) => {
@@ -148,12 +191,6 @@ export default function ConteoVotoSeguro() {
       const fresh = await window.storage.get("registros", true).catch(() => null);
       const current = fresh && fresh.value ? JSON.parse(fresh.value) : registros;
       const dniClean = dni.trim();
-      if (dniClean && current.some((r) => r.dni === dniClean)) {
-        setFormMsg("Este DNI ya está registrado. No se agregó un duplicado.");
-        setSaving(false);
-        return;
-      }
-      const promotorAsignado = currentUser.rol === "promotor" ? currentUser.nombre : (zona ? currentUser.nombre : currentUser.nombre);
       const nuevo = {
         id: uid(),
         nombre: nombre.trim(),
@@ -163,6 +200,18 @@ export default function ConteoVotoSeguro() {
         promotor: currentUser.rol === "promotor" ? currentUser.nombre : (currentUser.nombre || "Administrador"),
         ts: Date.now(),
       };
+      const duplicate = current.find((r) => isPotentialDuplicate(nuevo, r));
+      if (duplicate) {
+        const warning = isPotentialDuplicate(nuevo, duplicate);
+        setFormMsg(warning?.message || "Posible duplicado detectado. Verifica antes de continuar.");
+        setSaving(false);
+        return;
+      }
+      if (dniClean && current.some((r) => r.dni === dniClean)) {
+        setFormMsg("Este DNI ya está registrado. No se agregó un duplicado.");
+        setSaving(false);
+        return;
+      }
       const updated = [...current, nuevo];
       const result = await window.storage.set("registros", JSON.stringify(updated), true);
       if (!result) throw new Error("No se pudo guardar");
@@ -196,7 +245,7 @@ export default function ConteoVotoSeguro() {
     e.preventDefault();
     setUserMsg("");
     if (!nuevoUsuario.trim() || !nuevaClave.trim() || !nuevoNombre.trim()) {
-      setUserMsg("Completa usuario, contraseña y nombre del promotor.");
+      setUserMsg("Completa usuario, contraseña y nombre del usuario.");
       return;
     }
     try {
@@ -206,14 +255,21 @@ export default function ConteoVotoSeguro() {
         setUserMsg("Ese usuario ya existe.");
         return;
       }
-      const nuevo = { id: uid(), usuario: nuevoUsuario.trim(), clave: nuevaClave, rol: "promotor", nombre: nuevoNombre.trim() };
+      const nuevo = {
+        id: uid(),
+        usuario: nuevoUsuario.trim(),
+        clave: nuevaClave,
+        rol: nuevoRol,
+        nombre: nuevoNombre.trim(),
+      };
       const updated = [...current, nuevo];
       await window.storage.set("usuarios", JSON.stringify(updated), true);
       setUsuarios(updated);
       setNuevoUsuario("");
       setNuevaClave("");
       setNuevoNombre("");
-      setUserMsg("✓ Promotor creado.");
+      setNuevoRol("promotor");
+      setUserMsg(nuevoRol === "admin" ? "✓ Administrador creado." : "✓ Promotor creado.");
     } catch (err) {
       setUserMsg("No se pudo crear el usuario.");
     }
@@ -479,10 +535,10 @@ export default function ConteoVotoSeguro() {
         {/* USER MANAGEMENT (admin only) */}
         {isAdmin && (
           <div className="vs-panel vs-panel--wide">
-            <div className="vs-section-title">Cuentas de promotores</div>
+            <div className="vs-section-title">Cuentas de usuarios</div>
             <form onSubmit={addUsuario} style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
-                <label style={labelStyle}>Nombre del promotor</label>
+                <label style={labelStyle}>Nombre completo</label>
                 <input className="vs-input" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Ej. Juan Pérez" />
               </div>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
@@ -493,10 +549,20 @@ export default function ConteoVotoSeguro() {
                 <label style={labelStyle}>Contraseña</label>
                 <input className="vs-input" value={nuevaClave} onChange={(e) => setNuevaClave(e.target.value)} placeholder="contraseña" />
               </div>
+              <div style={{ flex: "1 1 150px", minWidth: 130 }}>
+                <label style={labelStyle}>Rol</label>
+                <select className="vs-input" value={nuevoRol} onChange={(e) => setNuevoRol(e.target.value)}>
+                  <option value="promotor">Promotor</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
               <button className="vs-btn vs-btn--primary" type="submit" style={{ flex: "1 1 100%" }}>
-                Crear promotor
+                Crear cuenta
               </button>
             </form>
+            <div style={{ marginTop: 10, fontSize: 12, color: "#5f4a3e", opacity: 0.8 }}>
+              Eliminar un usuario no borra los registros que haya creado.
+            </div>
             {userMsg && <div style={{ marginTop: 8, fontSize: 13, color: userMsg.startsWith("✓") ? TEAL : RED_BRIGHT }}>{userMsg}</div>}
 
             <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
