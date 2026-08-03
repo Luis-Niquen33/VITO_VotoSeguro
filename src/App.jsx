@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { collection, query as firestoreQuery, orderBy, onSnapshot, setDoc, deleteDoc, doc } from "firebase/firestore";
+import { db, isFirebaseConfigured } from "./firebase";
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -14,16 +16,29 @@ const TEAL = "#2F6B5E";
 const RULE = "#D8C9B8";
 
 function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  if (typeof crypto !== "undefined") {
+    if (typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto.getRandomValues === "function") {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+  }
+  throw new Error("Crypto API is required for UID generation");
 }
 
 // Real "palote" tally marks: groups of 5, the 5th stroke crossing the other 4.
 function TallyGroup({ n, size = 22, color = INK }) {
   const strokes = Math.min(n, 5);
+  const positions = Array.from({ length: strokes }, (_, i) => 4 + i * 8);
   return (
     <svg width={size * 1.6} height={size} viewBox="0 0 40 26" style={{ overflow: "visible" }}>
-      {Array.from({ length: strokes }).map((_, i) => (
-        <line key={i} x1={4 + i * 8} y1={2} x2={4 + i * 8} y2={24} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+      {positions.map((x) => (
+        <line key={`stroke-${x}`} x1={x} y1={2} x2={x} y2={24} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
       ))}
       {n >= 5 && <line x1={0} y1={22} x2={36} y2={2} stroke={color} strokeWidth={2.5} strokeLinecap="round" />}
     </svg>
@@ -38,7 +53,7 @@ function TallyRow({ count, color = INK, max = 60 }) {
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
       {Array.from({ length: groups }).map((_, i) => {
         const n = i === groups - 1 ? shown - i * 5 : 5;
-        return <TallyGroup key={i} n={n} color={color} />;
+        return <TallyGroup key={`group-${n}-${i}`} n={n} color={color} />;
       })}
       {rest > 0 && (
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color, opacity: 0.7 }}>+{rest} más</span>
@@ -101,7 +116,6 @@ export default function ConteoVotoSeguro() {
   const [loginUser, setLoginUser] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [query, setQuery] = useState("");
   const [nombre, setNombre] = useState("");
@@ -118,53 +132,107 @@ export default function ConteoVotoSeguro() {
   const [nuevoRol, setNuevoRol] = useState("promotor");
   const [userMsg, setUserMsg] = useState("");
 
+  const registrosCollection = db ? collection(db, "registros") : null;
+  const usuariosCollection = db ? collection(db, "usuarios") : null;
+
   const loadRegistros = useCallback(async (silent) => {
-    if (!silent) setLoading(true);
+    if (isFirebaseConfigured) return;
     try {
       const res = await window.storage.get("registros", true);
-      const parsed = res && res.value ? JSON.parse(res.value) : [];
+      const parsed = res?.value ? JSON.parse(res.value) : [];
       setRegistros(Array.isArray(parsed) ? parsed : []);
-    } catch (e) {
+    } catch (error_) {
+      console.warn("Error loading registros:", error_);
       setRegistros([]);
     } finally {
       setLastSync(new Date());
-      setLoading(false);
     }
-  }, []);
+  }, [isFirebaseConfigured]);
 
   const loadUsuarios = useCallback(async () => {
+    if (isFirebaseConfigured) return;
     try {
       const res = await window.storage.get("usuarios", true);
-      const parsed = res && res.value ? JSON.parse(res.value) : null;
+      const parsed = res?.value ? JSON.parse(res.value) : null;
       if (Array.isArray(parsed) && parsed.length > 0) {
         setUsuarios(parsed);
       } else {
         await window.storage.set("usuarios", JSON.stringify([DEFAULT_ADMIN]), true);
         setUsuarios([DEFAULT_ADMIN]);
       }
-    } catch (e) {
+    } catch (error_) {
+      console.warn("Error loading usuarios:", error_);
       try {
         await window.storage.set("usuarios", JSON.stringify([DEFAULT_ADMIN]), true);
         setUsuarios([DEFAULT_ADMIN]);
-      } catch (e2) {
+      } catch (error__) {
+        console.warn("Error writing default admin:", error__);
         setUsuarios([DEFAULT_ADMIN]);
       }
     }
-  }, []);
+  }, [isFirebaseConfigured]);
 
   useEffect(() => {
-    loadRegistros(false);
-    loadUsuarios();
-    const t = setInterval(() => loadRegistros(true), 6000);
-    return () => clearInterval(t);
-  }, [loadRegistros, loadUsuarios]);
+    if (!isFirebaseConfigured) {
+      loadRegistros(false);
+      loadUsuarios();
+      const t = setInterval(() => loadRegistros(true), 6000);
+      return () => clearInterval(t);
+    }
+
+    if (!registrosCollection || !usuariosCollection) return;
+
+    const registrosQuery = firestoreQuery(registrosCollection, orderBy("ts", "desc"));
+    const usuariosQuery = firestoreQuery(usuariosCollection, orderBy("nombre"));
+
+    const unsubscribeRegistros = onSnapshot(
+      registrosQuery,
+      (snapshot) => {
+        const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setRegistros(items);
+        setLastSync(new Date());
+      },
+      (error) => {
+        console.error("Firestore registros snapshot error:", error);
+      }
+    );
+
+    const unsubscribeUsuarios = onSnapshot(
+      usuariosQuery,
+      async (snapshot) => {
+        if (snapshot.empty) {
+          await setDoc(doc(usuariosCollection, DEFAULT_ADMIN.id), DEFAULT_ADMIN);
+          setUsuarios([DEFAULT_ADMIN]);
+          return;
+        }
+        const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setUsuarios(items);
+      },
+      (error) => {
+        console.error("Firestore usuarios snapshot error:", error);
+      }
+    );
+
+    return () => {
+      unsubscribeRegistros();
+      unsubscribeUsuarios();
+    };
+  }, [isFirebaseConfigured, loadRegistros, loadUsuarios, registrosCollection, usuariosCollection]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
     try {
-      const fresh = await window.storage.get("usuarios", true).catch(() => null);
-      const list = fresh && fresh.value ? JSON.parse(fresh.value) : usuarios || [DEFAULT_ADMIN];
+      let list = usuarios || [DEFAULT_ADMIN];
+      if (isFirebaseConfigured) {
+        if (!usuarios) {
+          setLoginError("Cargando usuarios... espera unos segundos e intenta de nuevo.");
+          return;
+        }
+      } else {
+        const fresh = await window.storage.get("usuarios", true).catch(() => null);
+        list = fresh?.value ? JSON.parse(fresh.value) : usuarios || [DEFAULT_ADMIN];
+      }
       const match = list.find((u) => u.usuario === loginUser.trim() && u.clave === loginPass);
       if (!match) {
         setLoginError("Usuario o contraseña incorrectos.");
@@ -174,7 +242,8 @@ export default function ConteoVotoSeguro() {
       setCurrentUser(match);
       setLoginUser("");
       setLoginPass("");
-    } catch (err) {
+    } catch (error_) {
+      console.error("Login error:", error_);
       setLoginError("No se pudo verificar el acceso. Intenta de nuevo.");
     }
   };
@@ -182,14 +251,18 @@ export default function ConteoVotoSeguro() {
   const addRegistro = async (e) => {
     e.preventDefault();
     setFormMsg("");
-    if (!nombre.trim() || !edad.trim()) {
-      setFormMsg("Nombre completo y edad son obligatorios.");
+    if (!nombre.trim()) {
+      setFormMsg("Nombre completo es obligatorio.");
       return;
     }
     setSaving(true);
     try {
-      const fresh = await window.storage.get("registros", true).catch(() => null);
-      const current = fresh && fresh.value ? JSON.parse(fresh.value) : registros;
+      const current = isFirebaseConfigured
+        ? registros
+        : await window.storage
+            .get("registros", true)
+            .then((res) => (res?.value ? JSON.parse(res.value) : registros))
+            .catch(() => registros);
       const dniClean = dni.trim();
       const nuevo = {
         id: uid(),
@@ -213,9 +286,14 @@ export default function ConteoVotoSeguro() {
         return;
       }
       const updated = [...current, nuevo];
-      const result = await window.storage.set("registros", JSON.stringify(updated), true);
-      if (!result) throw new Error("No se pudo guardar");
-      setRegistros(updated);
+      if (isFirebaseConfigured) {
+        await setDoc(doc(registrosCollection, nuevo.id), nuevo);
+        setRegistros(updated);
+      } else {
+        const result = await window.storage.set("registros", JSON.stringify(updated), true);
+        if (!result) throw new Error("No se pudo guardar");
+        setRegistros(updated);
+      }
       setNombre("");
       setEdad("");
       setDni("");
@@ -223,6 +301,7 @@ export default function ConteoVotoSeguro() {
       setFormMsg("✓ Registrado correctamente.");
       setLastSync(new Date());
     } catch (err) {
+      console.error("Save registro error:", err);
       setFormMsg("Error al guardar. Intenta de nuevo.");
     } finally {
       setSaving(false);
@@ -231,12 +310,18 @@ export default function ConteoVotoSeguro() {
 
   const removeRegistro = async (id) => {
     try {
+      if (isFirebaseConfigured) {
+        await deleteDoc(doc(registrosCollection, id));
+        setRegistros((current) => current.filter((r) => r.id !== id));
+        return;
+      }
       const fresh = await window.storage.get("registros", true).catch(() => null);
-      const current = fresh && fresh.value ? JSON.parse(fresh.value) : registros;
+      const current = fresh?.value ? JSON.parse(fresh.value) : registros;
       const updated = current.filter((r) => r.id !== id);
       await window.storage.set("registros", JSON.stringify(updated), true);
       setRegistros(updated);
     } catch (e) {
+      console.warn("Delete registro error:", e);
       setFormMsg("No se pudo eliminar el registro.");
     }
   };
@@ -249,8 +334,7 @@ export default function ConteoVotoSeguro() {
       return;
     }
     try {
-      const fresh = await window.storage.get("usuarios", true).catch(() => null);
-      const current = fresh && fresh.value ? JSON.parse(fresh.value) : usuarios || [DEFAULT_ADMIN];
+      const current = usuarios || [DEFAULT_ADMIN];
       if (current.some((u) => u.usuario === nuevoUsuario.trim())) {
         setUserMsg("Ese usuario ya existe.");
         return;
@@ -263,26 +347,38 @@ export default function ConteoVotoSeguro() {
         nombre: nuevoNombre.trim(),
       };
       const updated = [...current, nuevo];
-      await window.storage.set("usuarios", JSON.stringify(updated), true);
-      setUsuarios(updated);
+      if (isFirebaseConfigured) {
+        await setDoc(doc(usuariosCollection, nuevo.id), nuevo);
+        setUsuarios(updated);
+      } else {
+        await window.storage.set("usuarios", JSON.stringify(updated), true);
+        setUsuarios(updated);
+      }
       setNuevoUsuario("");
       setNuevaClave("");
       setNuevoNombre("");
       setNuevoRol("promotor");
       setUserMsg(nuevoRol === "admin" ? "✓ Administrador creado." : "✓ Promotor creado.");
     } catch (err) {
+      console.error("Create usuario error:", err);
       setUserMsg("No se pudo crear el usuario.");
     }
   };
 
   const deleteUsuario = async (id) => {
     try {
+      if (isFirebaseConfigured) {
+        await deleteDoc(doc(usuariosCollection, id));
+        setUsuarios((current) => current.filter((u) => u.id !== id));
+        return;
+      }
       const fresh = await window.storage.get("usuarios", true).catch(() => null);
-      const current = fresh && fresh.value ? JSON.parse(fresh.value) : usuarios || [];
+      const current = fresh?.value ? JSON.parse(fresh.value) : usuarios || [];
       const updated = current.filter((u) => u.id !== id);
       await window.storage.set("usuarios", JSON.stringify(updated), true);
       setUsuarios(updated);
     } catch (e) {
+      console.warn("Delete usuario error:", e);
       setUserMsg("No se pudo eliminar el usuario.");
     }
   };
@@ -347,17 +443,17 @@ export default function ConteoVotoSeguro() {
             Conteo de Voto Seguro
           </h1>
 
-          <label style={labelStyle}>Usuario</label>
-          <input className="vs-input" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} placeholder="usuario" autoFocus />
+          <label htmlFor="login-usuario" style={labelStyle}>Usuario</label>
+          <input id="login-usuario" className="vs-input" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} placeholder="usuario" autoFocus />
 
-          <label style={labelStyle}>Contraseña</label>
-          <input className="vs-input" type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="contraseña" />
+          <label htmlFor="login-contrasena" style={labelStyle}>Contraseña</label>
+          <input id="login-contrasena" className="vs-input" type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} placeholder="contraseña" />
 
           <button className="vs-btn vs-btn--primary" type="submit" style={{ width: "100%", marginTop: 16 }}>
             Ingresar
           </button>
           {loginError && <div style={{ marginTop: 10, fontSize: 13, color: RED_BRIGHT, textAlign: "center" }}>{loginError}</div>}
-          {usuarios && usuarios.length === 1 && usuarios[0].id === "admin-1" && (
+          {usuarios?.length === 1 && usuarios[0]?.id === "admin-1" && (
             <div style={{ marginTop: 14, fontSize: 11.5, color: INK, opacity: 0.6, textAlign: "center", lineHeight: 1.5 }}>
               Primer ingreso: usuario <b>admin</b>, contraseña <b>VotoSeguro2026</b>. Cámbiala luego creando otro usuario y eliminando este.
             </div>
@@ -428,21 +524,21 @@ export default function ConteoVotoSeguro() {
             Nueva ficha de registro
           </div>
 
-          <label style={labelStyle}>Nombre completo</label>
-          <input className="vs-input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. María Torres Ríos" />
+          <label htmlFor="registro-nombre" style={labelStyle}>Nombre completo</label>
+          <input id="registro-nombre" className="vs-input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. María Torres Ríos" />
 
-          <label style={labelStyle}>Edad</label>
-          <input className="vs-input" style={{ fontFamily: "'IBM Plex Mono', monospace" }} value={edad} onChange={(e) => setEdad(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="Ej. 34" inputMode="numeric" />
+          <label htmlFor="registro-edad" style={labelStyle}>Edad (opcional)</label>
+          <input id="registro-edad" className="vs-input" style={{ fontFamily: "'IBM Plex Mono', monospace" }} value={edad} onChange={(e) => setEdad(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="Ej. 34" inputMode="numeric" />
 
-          <label style={labelStyle}>Zona o calle</label>
-          <input className="vs-input" list="zonas-list" value={zona} onChange={(e) => setZona(e.target.value)} placeholder="Ej. Etén Centro / Calle Grau 210" />
+          <label htmlFor="registro-zona" style={labelStyle}>Zona o calle</label>
+          <input id="registro-zona" className="vs-input" list="zonas-list" value={zona} onChange={(e) => setZona(e.target.value)} placeholder="Ej. Etén Centro / Calle Grau 210" />
           <datalist id="zonas-list">{zonas.map((z) => <option key={z} value={z} />)}</datalist>
 
-          <label style={labelStyle}>Promotor responsable</label>
-          <input className="vs-input" style={{ background: "#F2ECE0", color: "#666" }} value={currentUser.nombre} disabled />
+          <label htmlFor="registro-promotor" style={labelStyle}>Promotor responsable</label>
+          <input id="registro-promotor" className="vs-input" style={{ background: "#F2ECE0", color: "#666" }} value={currentUser.nombre} disabled />
 
-          <label style={labelStyle}>DNI (opcional)</label>
-          <input className="vs-input" style={{ fontFamily: "'IBM Plex Mono', monospace" }} value={dni} onChange={(e) => setDni(e.target.value.replace(/\D/g, ""))} placeholder="Ej. 12345678" inputMode="numeric" />
+          <label htmlFor="registro-dni" style={labelStyle}>DNI (opcional)</label>
+          <input id="registro-dni" className="vs-input" style={{ fontFamily: "'IBM Plex Mono', monospace" }} value={dni} onChange={(e) => setDni(e.target.value.replace(/\D/g, ""))} placeholder="Ej. 12345678" inputMode="numeric" />
 
           <button className="vs-btn vs-btn--primary" type="submit" disabled={saving} style={{ width: "100%", marginTop: 16, opacity: saving ? 0.85 : 1 }}>
             {saving ? "Guardando…" : "Registrar voto seguro"}
@@ -510,7 +606,7 @@ export default function ConteoVotoSeguro() {
                 {filtered.slice().sort((a, b) => b.ts - a.ts).map((r) => (
                   <tr key={r.id}>
                     <td>{r.nombre}</td>
-                    <td style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{r.edad}</td>
+                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", opacity: r.edad ? 1 : 0.6 }}>{r.edad || "—"}</td>
                     <td>{r.zona}</td>
                     {isAdmin && <td>{r.promotor}</td>}
                     <td style={{ fontFamily: "'IBM Plex Mono', monospace", opacity: r.dni ? 1 : 0.4 }}>{r.dni || "—"}</td>
@@ -538,20 +634,20 @@ export default function ConteoVotoSeguro() {
             <div className="vs-section-title">Cuentas de usuarios</div>
             <form onSubmit={addUsuario} style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
-                <label style={labelStyle}>Nombre completo</label>
-                <input className="vs-input" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Ej. Juan Pérez" />
+                <label htmlFor="nuevo-nombre" style={labelStyle}>Nombre completo</label>
+                <input id="nuevo-nombre" className="vs-input" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Ej. Juan Pérez" />
               </div>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
-                <label style={labelStyle}>Usuario</label>
-                <input className="vs-input" value={nuevoUsuario} onChange={(e) => setNuevoUsuario(e.target.value)} placeholder="usuario" />
+                <label htmlFor="nuevo-usuario" style={labelStyle}>Usuario</label>
+                <input id="nuevo-usuario" className="vs-input" value={nuevoUsuario} onChange={(e) => setNuevoUsuario(e.target.value)} placeholder="usuario" />
               </div>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
-                <label style={labelStyle}>Contraseña</label>
-                <input className="vs-input" value={nuevaClave} onChange={(e) => setNuevaClave(e.target.value)} placeholder="contraseña" />
+                <label htmlFor="nuevo-clave" style={labelStyle}>Contraseña</label>
+                <input id="nuevo-clave" className="vs-input" value={nuevaClave} onChange={(e) => setNuevaClave(e.target.value)} placeholder="contraseña" />
               </div>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
-                <label style={labelStyle}>Rol</label>
-                <select className="vs-input" value={nuevoRol} onChange={(e) => setNuevoRol(e.target.value)}>
+                <label htmlFor="nuevo-rol" style={labelStyle}>Rol</label>
+                <select id="nuevo-rol" className="vs-input" value={nuevoRol} onChange={(e) => setNuevoRol(e.target.value)}>
                   <option value="promotor">Promotor</option>
                   <option value="admin">Administrador</option>
                 </select>
@@ -587,8 +683,3 @@ export default function ConteoVotoSeguro() {
 }
 
 const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 600, color: RED, marginTop: 12, marginBottom: 5 };
-const inputStyle = {
-  width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 6,
-  border: `1px solid ${RULE}`, fontSize: 14, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: 2,
-};
-const sectionTitle = { fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 };

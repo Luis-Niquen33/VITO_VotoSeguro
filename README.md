@@ -2,6 +2,34 @@
 
 App para que promotores de campaña registren votos seguros (nombre, edad, zona/calle, DNI opcional) con acceso separado por rol.
 
+## Firebase
+
+Esta versión ya incluye integración con Firebase Firestore para que los registros se sincronicen entre dispositivos.
+
+1. Crea un proyecto en Firebase.
+2. Activa Firestore en modo de prueba.
+3. Crea un archivo `.env` en la raíz del proyecto con estos valores:
+
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+```
+
+4. Asegúrate de no subir el archivo `.env` al repositorio. Ya está ignorado en `.gitignore`.
+
+5. Instala dependencias y ejecuta el proyecto:
+
+```bash
+npm install
+npm run dev
+```
+
+Si no configuras Firebase, la app seguirá funcionando con `localStorage` como respaldo, pero los datos solo se guardarán por dispositivo.
+
 ## Publicación en GitHub Pages
 
 1. Crea un repositorio en GitHub con el nombre `voto-seguro-eten`.
