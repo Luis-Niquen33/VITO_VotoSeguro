@@ -1,22 +1,33 @@
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAu94pYTRY-5LVCDzMVYaH5vMLkY7EA4Vc",
-  authDomain: "votoseguro-1ce0f.firebaseapp.com",
-  projectId: "votoseguro-1ce0f",
-  storageBucket: "votoseguro-1ce0f.firebasestorage.app",
-  messagingSenderId: "1000398352820",
-  appId: "1:1000398352820:web:e380fedd20ffe4c7fcc2e1",
-  measurementId: "G-72GD2860QT"
-};
+// Read Vite env vars (in dev from .env, in CI from GitHub Actions secrets)
+const {
+  VITE_FIREBASE_API_KEY,
+  VITE_FIREBASE_AUTH_DOMAIN,
+  VITE_FIREBASE_PROJECT_ID,
+  VITE_FIREBASE_STORAGE_BUCKET,
+  VITE_FIREBASE_MESSAGING_SENDER_ID,
+  VITE_FIREBASE_APP_ID,
+  VITE_FIREBASE_MEASUREMENT_ID
+} = import.meta.env;
 
-export const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean);
+const isFirebaseConfigured = !!VITE_FIREBASE_API_KEY && !!VITE_FIREBASE_PROJECT_ID;
 
-let app = null;
+let db = null;
+
 if (isFirebaseConfigured) {
-  app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-}
-const db = app ? getFirestore(app) : null;
+  const firebaseConfig = {
+    apiKey: VITE_FIREBASE_API_KEY,
+    authDomain: VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: VITE_FIREBASE_PROJECT_ID,
+    storageBucket: VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: VITE_FIREBASE_APP_ID,
+  };
 
-export { db };
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+}
+
+export { db, isFirebaseConfigured };
