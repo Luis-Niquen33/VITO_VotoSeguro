@@ -1,13 +1,76 @@
-// Firestore rules para pruebas rápidas.
-// START: Use estas reglas solo para pruebas (modo abierto). Cambia a reglas seguras en producción.
+// Firestore rules para la app "Conteo de Voto Seguro".
+//
+// LIMITACIÓN IMPORTANTE: esta app NO usa Firebase Authentication (el login
+// compara usuario/clave contra la colección "usuarios" desde el propio
+// cliente). Sin `request.auth`, Firestore no puede distinguir admin de
+// promotor ni "quién soy" a nivel de base de datos: cualquier persona que
+// abra la página puede leer/escribir lo que el rol "read: if true" permita.
+//
+// Estas reglas por eso solo pueden:
+//  1) Restringir a las colecciones conocidas (todo lo demás, denegado).
+//  2) Validar la forma de los documentos al crear (evita basura o payloads
+//     gigantes) y bloquear updates/deletes que la app nunca hace.
+//  3) Proteger la cuenta admin semilla ("admin-1") para que no se borre
+//     directamente por API.
+//
+// Lo que estas reglas NO resuelven:
+//  - Las contraseñas en "usuarios.clave" siguen viajando y quedando en texto
+//    plano y son legibles por cualquiera con el projectId (visible en el
+//    bundle del cliente).
+//  - Los datos de "registros" (nombre, edad, DNI, zona) son PII y quedan
+//    visibles a cualquiera que abra la app, esté "logueado" o no a nivel de
+//    Firestore.
+// La solución real es autenticar y validar en un backend (el server/ con
+// Express + JWT + bcrypt que ya existe en este repo) y dejar Firestore
+// cerrado por completo (allow read, write: if false) una vez migres a esa
+// API. Ver server/index.js.
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permitir lectura/escritura a cualquier cliente (modo test)
+
+    function isNonEmptyString(v, maxLen) {
+      return v is string && v.size() > 0 && v.size() <= maxLen;
+    }
+    function isBoundedString(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    match /registros/{regId} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(['id', 'nombre', 'edad', 'dni', 'zona', 'promotor', 'ts']) &&
+        request.resource.data.id == regId &&
+        isNonEmptyString(request.resource.data.nombre, 120) &&
+        isBoundedString(request.resource.data.edad, 3) &&
+        isBoundedString(request.resource.data.dni, 20) &&
+        isNonEmptyString(request.resource.data.zona, 120) &&
+        isNonEmptyString(request.resource.data.promotor, 120) &&
+        request.resource.data.ts is number &&
+        request.resource.data.ts <= request.time.toMillis() + 60000;
+
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    match /usuarios/{userId} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(['id', 'usuario', 'clave', 'rol', 'nombre']) &&
+        request.resource.data.id == userId &&
+        isNonEmptyString(request.resource.data.usuario, 60) &&
+        isNonEmptyString(request.resource.data.clave, 200) &&
+        isNonEmptyString(request.resource.data.nombre, 120) &&
+        request.resource.data.rol in ['admin', 'promotor'];
+
+      allow update: if false;
+      allow delete: if userId != 'admin-1';
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
-
-// Recomendación: para producción, restringe por autenticación o por campos específicos.
