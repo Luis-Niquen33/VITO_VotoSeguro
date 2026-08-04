@@ -1,98 +1,128 @@
 # Conteo de Voto Seguro · Etén
 
-App para que promotores de campaña registren votos seguros (nombre, edad, zona/calle, DNI opcional) con acceso separado por rol.
+App full-stack para que promotores de campaña registren votos seguros y un administrador vea el consolidado. Ahora con **backend real (Node/Express) + base de datos PostgreSQL 17**, así que los datos sí se sincronizan entre celulares y computadoras distintas.
 
-## Firebase
-
-Esta versión ya incluye integración con Firebase Firestore para que los registros se sincronicen entre dispositivos.
-
-1. Crea un proyecto en Firebase.
-2. Activa Firestore en modo de prueba.
-3. Crea un archivo `.env` en la raíz del proyecto con estos valores:
-
-```env
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
+```
+voto-seguro-eten/
+├── docker-compose.yml   # Postgres 17 para correr localmente
+├── server/              # API en Express
+└── client/              # App en React (Vite)
 ```
 
-4. Asegúrate de no subir el archivo `.env` al repositorio. Ya está ignorado en `.gitignore`.
+Contraseñas guardadas con hash (bcrypt) y sesiones con JWT — mucho más seguro que la versión anterior basada en localStorage.
 
-5. Instala dependencias y ejecuta el proyecto:
+---
+
+## 1. Abrir en VS Code
+
+Descomprime la carpeta y ábrela en VS Code (`Archivo > Abrir carpeta…`). Necesitas [Node.js 18+](https://nodejs.org/) instalado.
+
+## 2. Levantar PostgreSQL 17 localmente
+
+La forma más simple es con Docker (si no lo tienes, instala [Docker Desktop](https://www.docker.com/products/docker-desktop/)):
 
 ```bash
-npm install
-npm run dev
+docker compose up -d
 ```
 
-Si no configuras Firebase, la app seguirá funcionando con `localStorage` como respaldo, pero los datos solo se guardarán por dispositivo.
+Esto levanta un PostgreSQL 17 en `localhost:5432` con usuario `postgres`, contraseña `postgres`, base de datos `voto_seguro`.
 
-## Publicación en GitHub Pages
+> ¿No quieres usar Docker? Instala PostgreSQL 17 directamente en tu máquina y crea una base de datos llamada `voto_seguro`; luego ajusta `DATABASE_URL` en el paso siguiente.
 
-1. Crea un repositorio en GitHub con el nombre `voto-seguro-eten`.
-2. Desde la carpeta del proyecto ejecuta:
+## 3. Backend (API)
+
+En una terminal:
+
+```bash
+cd server
+cp .env.example .env
+npm install
+npm run migrate   # crea las tablas y el usuario admin por defecto
+npm run dev       # levanta la API en http://localhost:4000
+```
+
+La migración imprime el usuario/contraseña del administrador creado (por defecto `admin` / `VotoSeguro2026`, definido en `.env`). **Cámbialo** antes de usar en producción, o crea otro admin y luego ajusta el `.env`.
+
+## 4. Frontend (app)
+
+En otra terminal:
+
+```bash
+cd client
+cp .env.example .env
+npm install
+npm run dev       # abre en http://localhost:5173
+```
+
+Abre `http://localhost:5173` — deberías ver la pantalla de login "Conteo de Voto Seguro · Etén".
+
+> Si quieres sincronizar datos entre laptop y celular, copia las claves de Firebase a `client/.env` usando las variables `VITE_FIREBASE_*` del ejemplo. Cuando el frontend tenga esas variables, usará Firebase en lugar de localStorage.
+
+---
+
+## 5. Conectarlo con GitHub
+
+Desde la raíz del proyecto (`voto-seguro-eten/`):
 
 ```bash
 git init
 git add .
-git commit -m "Primera versión"
+git commit -m "Primera versión: Conteo de Voto Seguro"
+```
+
+Luego, en GitHub:
+
+1. Crea un repositorio nuevo (vacío, sin README) en https://github.com/new.
+2. Copia la URL que te da (algo como `https://github.com/tu-usuario/voto-seguro-eten.git`).
+3. Conéctalo y sube el código:
+
+```bash
+git remote add origin https://github.com/tu-usuario/voto-seguro-eten.git
 git branch -M main
-git remote add origin https://github.com/TU_USUARIO/voto-seguro-eten.git
 git push -u origin main
 ```
 
-3. En GitHub ve a Settings > Pages y habilita Deploy from a branch usando la rama `main` y la carpeta `/root`.
-4. Si prefieres despliegue automático, el proyecto ya incluye un workflow listo en `.github/workflows/deploy.yml`.
+El archivo `.gitignore` ya excluye `node_modules`, `dist` y los `.env` (con tus contraseñas/secretos), así que no se subirán por accidente.
 
-## Cómo abrir en VS Code
+---
 
-1. Descomprime la carpeta y ábrela en VS Code (`Archivo > Abrir carpeta…`).
-2. Abre una terminal en VS Code (`Terminal > Nueva terminal`) y ejecuta:
-   ```bash
-   npm install
-   npm run dev
-   ```
-3. Abre el link que aparece en la terminal (normalmente `http://localhost:5173`).
+## 6. Ponerlo en línea (para usarlo desde el celular, desde cualquier lugar)
 
-Necesitas tener [Node.js](https://nodejs.org/) instalado (versión 18 o superior).
+Necesitas hospedar tres cosas: la base de datos, la API, y el frontend. Una combinación simple y con buen nivel gratuito:
 
-## Primer ingreso
+### Opción recomendada: Railway (API + Postgres) + Vercel (frontend)
 
-- **Usuario:** `admin`
-- **Contraseña:** `VotoSeguro2026`
+**Base de datos y API en Railway:**
+1. Entra a [railway.app](https://railway.app) y conecta tu cuenta de GitHub.
+2. Crea un proyecto nuevo → "Deploy from GitHub repo" → selecciona tu repo.
+3. Añade un servicio de **PostgreSQL** desde el marketplace de Railway (te da automáticamente una variable `DATABASE_URL`).
+4. En el servicio de tu API (carpeta `server`), configura:
+   - **Root directory**: `server`
+   - **Start command**: `npm start`
+   - Variables de entorno: `DATABASE_URL` (copia la que generó el Postgres de Railway), `JWT_SECRET` (uno largo y aleatorio), `ADMIN_DEFAULT_USER`, `ADMIN_DEFAULT_PASS`, `ADMIN_DEFAULT_NAME`, `CORS_ORIGIN` (la URL de tu frontend, la agregas después).
+5. Corre la migración una vez, desde la consola/shell de Railway del servicio: `npm run migrate`.
+6. Railway te da una URL pública para tu API, ej. `https://voto-seguro-eten-api.up.railway.app`.
 
-Apenas entres, crea tu propio usuario administrador con otra contraseña (agregando una cuenta con rol de administrador directamente en `src/App.jsx` si quieres, o pídeme ayuda para agregar esa opción al panel) y no compartas la cuenta `admin` por defecto.
+**Frontend en Vercel:**
+1. Entra a [vercel.com](https://vercel.com) y conecta tu cuenta de GitHub.
+2. "Add New Project" → selecciona tu repo.
+3. **Root directory**: `client`.
+4. Variable de entorno: `VITE_API_URL` = la URL pública de tu API en Railway.
+5. Deploy. Vercel te da una URL pública, ej. `https://voto-seguro-eten.vercel.app` — ese es el link que abres desde el celular.
+6. Vuelve a Railway y actualiza `CORS_ORIGIN` con esta URL de Vercel, para que solo tu frontend pueda hablar con tu API.
 
-## ⚠️ Limitación importante: los datos NO se comparten entre dispositivos
+Con ambos conectados a GitHub, cada vez que hagas `git push` a `main`, se actualizan solos (CI/CD automático).
 
-Esta versión guarda los datos en el `localStorage` del navegador (un archivo del propio navegador), **no en un servidor**. Eso significa:
+### Alternativas
 
-- Cada computadora o celular que abra la app tiene **su propia copia** de los registros y usuarios — no se sincronizan entre sí.
-- Si borras el caché/datos del navegador, se pierde la información.
-- Es perfecta para probar la app o para que **una sola persona** la use en un dispositivo, pero **no sirve tal cual** para que varios promotores vean el mismo conteo en tiempo real desde distintos celulares.
+- **Render.com**: similar a Railway, también soporta Postgres + servicios Node + sitios estáticos, todo conectado a GitHub.
+- **Supabase**: si prefieres que la base de datos la administre un proveedor con panel visual (incluye Postgres real), y despliegas la API en Render/Railway apuntando a esa `DATABASE_URL`.
 
-### Si necesitas sincronización real entre dispositivos
+---
 
-Para que todos los promotores compartan el mismo conteo en vivo, la app necesita un backend con base de datos. Opciones razonables, de más simple a más robusta:
+## Notas de seguridad para producción
 
-1. **Firebase (Firestore) o Supabase** — servicios listos para usar, con un plan gratuito que probablemente te alcance para una campaña. Solo hay que reemplazar el archivo `src/storage.js` por las llamadas a su SDK.
-2. **Un pequeño servidor propio** (Node.js + Express + una base de datos como PostgreSQL o SQLite), si prefieres tener el control total de dónde viven los datos.
-
-Dime si quieres que te arme cualquiera de las dos opciones y seguimos desde ahí.
-
-## Estructura del proyecto
-
-```
-voto-seguro-eten/
-├── index.html
-├── package.json
-├── vite.config.js
-├── src/
-│   ├── main.jsx       # punto de entrada
-│   ├── App.jsx        # toda la app (login, formulario, tablero, gestión de usuarios)
-│   └── storage.js      # capa de almacenamiento (hoy: localStorage)
-└── README.md
-```
+- Cambia `JWT_SECRET` y la contraseña del admin por defecto antes de compartir el link con tu equipo.
+- Ajusta `CORS_ORIGIN` en el servidor a la URL exacta de tu frontend (evita dejarlo en `*`).
+- Considera activar HTTPS (Railway/Render/Vercel lo hacen automáticamente).
+- Este sistema separa el acceso por rol (admin ve todo, promotor ve solo lo suyo), pero sigue siendo una app de campaña, no un sistema con auditoría electoral formal — no la uses para nada que requiera cumplimiento legal estricto sin revisión adicional.

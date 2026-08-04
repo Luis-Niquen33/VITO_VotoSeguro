@@ -434,10 +434,10 @@ export default function ConteoVotoSeguro() {
     return (
       <div className="vs-shell--login">
         <style>{FONTS}</style>
-        <form onSubmit={handleLogin} className="vs-login-card">
+        <form onSubmit={handleLogin} className="vs-login-card" noValidate>
           <div className="vs-brand">ET</div>
           <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: RED_BRIGHT, marginBottom: 4, textAlign: "center" }}>
-            Etén
+            Ciudad Eten
           </div>
           <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 26, margin: "0 0 22px", textAlign: "center", color: INK }}>
             Conteo de Voto Seguro
@@ -458,6 +458,11 @@ export default function ConteoVotoSeguro() {
               Primer ingreso: usuario <b>admin</b>, contraseña <b>VotoSeguro2026</b>. Cámbiala luego creando otro usuario y eliminando este.
             </div>
           )}
+          {!isFirebaseConfigured && (
+            <div style={{ marginTop: 16, fontSize: 12, color: INK, opacity: 0.75, textAlign: "center", lineHeight: 1.6, border: "1px solid #d8c9b8", borderRadius: 12, background: "#fff8f0", padding: "12px 14px" }}>
+              La aplicación está en modo local y no sincroniza entre dispositivos. Para usar Firestore y que los datos se compartan entre laptop y celular, configura las variables `VITE_FIREBASE_*` en un archivo <code>.env</code>.
+            </div>
+          )}
         </form>
       </div>
     );
@@ -476,7 +481,7 @@ export default function ConteoVotoSeguro() {
           <div className="vs-hero-top">
             <div>
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: GOLD, marginBottom: 6 }}>
-                Etén
+                Ciudad Eten
               </div>
               <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 30, margin: 0 }}>
                 Conteo de Voto Seguro
@@ -519,7 +524,7 @@ export default function ConteoVotoSeguro() {
 
       <div className="vs-grid" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 60px", display: "grid", gridTemplateColumns: "minmax(280px, 340px) 1fr", gap: 24 }}>
         {/* FORM */}
-        <form onSubmit={addRegistro} className="vs-panel" style={{ alignSelf: "start" }}>
+        <form onSubmit={addRegistro} className="vs-panel" style={{ alignSelf: "start" }} noValidate>
           <div className="vs-section-title" style={{ marginBottom: 14 }}>
             Nueva ficha de registro
           </div>
@@ -632,7 +637,7 @@ export default function ConteoVotoSeguro() {
         {isAdmin && (
           <div className="vs-panel vs-panel--wide">
             <div className="vs-section-title">Cuentas de usuarios</div>
-            <form onSubmit={addUsuario} style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <form onSubmit={addUsuario} style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }} noValidate>
               <div style={{ flex: "1 1 150px", minWidth: 130 }}>
                 <label htmlFor="nuevo-nombre" style={labelStyle}>Nombre completo</label>
                 <input id="nuevo-nombre" className="vs-input" value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} placeholder="Ej. Juan Pérez" />
