@@ -1,0 +1,13 @@
+// Firestore rules para pruebas rápidas.
+// START: Use estas reglas solo para pruebas (modo abierto). Cambia a reglas seguras en producción.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permitir lectura/escritura a cualquier cliente (modo test)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
+// Recomendación: para producción, restringe por autenticación o por campos específicos.
