@@ -89,6 +89,17 @@ button:hover {
   gap: 16px;
 }
 
+.vs-hero-user {
+  text-align: right;
+}
+
+.vs-hero-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .vs-hero-stats {
   margin-top: 24px;
   display: flex;
@@ -123,6 +134,7 @@ button:hover {
   border: 1px solid #d8c9b8;
   border-radius: 16px;
   padding: 22px;
+  min-width: 0;
 }
 
 .vs-panel--wide {
@@ -234,13 +246,82 @@ button:hover {
 @media (max-width: 720px) {
   .vs-grid {
     grid-template-columns: 1fr !important;
+    padding: 20px 16px 44px !important;
+    gap: 16px !important;
   }
 
   .vs-hero {
-    padding: 24px 16px 28px;
+    padding: 20px 16px 26px;
+  }
+
+  .vs-hero-inner h1 {
+    font-size: 24px !important;
+  }
+
+  .vs-hero-stats {
+    gap: 8px;
+  }
+
+  .vs-stat-card {
+    min-width: calc(50% - 4px);
+    padding: 12px 14px;
   }
 
   .vs-panel {
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .vs-table {
+    font-size: 12.5px;
+  }
+
+  .vs-table th,
+  .vs-table td {
+    padding: 8px 6px;
+  }
+
+  .vs-btn {
+    padding: 11px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .vs-login-card {
+    padding: 26px 20px;
+    border-radius: 16px;
+  }
+
+  .vs-hero-user {
+    text-align: left;
+    width: 100%;
+  }
+
+  .vs-hero-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .vs-hero-actions .vs-btn {
+    flex: 1 1 auto;
+  }
+
+  .vs-stat-card {
+    min-width: 100%;
+  }
+
+  .vs-toolbar {
+    width: 100%;
+  }
+
+  .vs-toolbar .vs-btn {
+    width: 100%;
+  }
+}
+
+/* Prevent iOS Safari from auto-zooming into inputs shorter than 16px */
+@media (max-width: 720px) {
+  .vs-input,
+  select.vs-input {
+    font-size: 16px;
   }
 }

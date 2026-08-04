@@ -514,22 +514,20 @@ export default function ConteoVotoSeguro() {
                 Registro rápido para promotores, resumen por zona y exportación sencilla para el cierre de jornada.
               </div>
             </div>
-            <div style={{ textAlign: "right" }}>
+            <div className="vs-hero-user">
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.8 }}>
                 {isAdmin ? "Administrador" : "Promotor"} · {currentUser.nombre}
               </div>
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-                {isAdmin && (
-                  <button
-                    onClick={refreshNow}
-                    type="button"
-                    className="vs-btn vs-btn--secondary"
-                    disabled={refreshing}
-                    style={{ opacity: refreshing ? 0.7 : 1 }}
-                  >
-                    {refreshing ? "Actualizando…" : "↻ Actualizar"}
-                  </button>
-                )}
+              <div className="vs-hero-actions">
+                <button
+                  onClick={refreshNow}
+                  type="button"
+                  className="vs-btn vs-btn--secondary"
+                  disabled={refreshing}
+                  style={{ opacity: refreshing ? 0.7 : 1 }}
+                >
+                  {refreshing ? "Actualizando…" : "↻ Actualizar"}
+                </button>
                 <button
                   onClick={() => setCurrentUser(null)}
                   type="button"
