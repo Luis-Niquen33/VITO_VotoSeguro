@@ -125,6 +125,8 @@ export default function ConteoVotoSeguro() {
   const [zona, setZona] = useState("");
   const [formMsg, setFormMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ nombre: "", edad: "", dni: "", zona: "" });
 
   // Panel de gestión de usuarios (admin)
   const [nuevoUsuario, setNuevoUsuario] = useState("");
@@ -347,6 +349,51 @@ export default function ConteoVotoSeguro() {
     } catch (e) {
       console.warn("Delete registro error:", e);
       setFormMsg("No se pudo eliminar el registro.");
+    }
+  };
+
+  const startEdit = (r) => {
+    setEditingId(r.id);
+    setEditForm({ nombre: r.nombre, edad: r.edad || "", dni: r.dni || "", zona: r.zona });
+    setFormMsg("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (id) => {
+    if (!editForm.nombre.trim()) {
+      setFormMsg("Nombre completo es obligatorio.");
+      return;
+    }
+    try {
+      const original = registros.find((r) => r.id === id);
+      if (!original) {
+        setEditingId(null);
+        return;
+      }
+      const actualizado = {
+        ...original,
+        nombre: editForm.nombre.trim(),
+        edad: editForm.edad.trim(),
+        dni: editForm.dni.trim(),
+        zona: editForm.zona.trim() || "Sin zona/calle",
+      };
+      if (isFirebaseConfigured) {
+        await setDoc(doc(registrosCollection, id), actualizado);
+        setRegistros((current) => current.map((r) => (r.id === id ? actualizado : r)));
+      } else {
+        const fresh = await window.storage.get("registros", true).catch(() => null);
+        const current = fresh?.value ? JSON.parse(fresh.value) : registros;
+        const updated = current.map((r) => (r.id === id ? actualizado : r));
+        await window.storage.set("registros", JSON.stringify(updated), true);
+        setRegistros(updated);
+      }
+      setEditingId(null);
+    } catch (e) {
+      console.warn("Edit registro error:", e);
+      setFormMsg("No se pudo guardar la edición.");
     }
   };
 
@@ -642,21 +689,54 @@ export default function ConteoVotoSeguro() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice().sort((a, b) => b.ts - a.ts).map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.nombre}</td>
-                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", opacity: r.edad ? 1 : 0.6 }}>{r.edad || "—"}</td>
-                    <td>{r.zona}</td>
-                    {isAdmin && <td>{r.promotor}</td>}
-                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", opacity: r.dni ? 1 : 0.4 }}>{r.dni || "—"}</td>
-                    <td style={{ opacity: 0.6 }}>{new Date(r.ts).toLocaleDateString()}</td>
-                    <td>
-                      <button onClick={() => removeRegistro(r.id)} type="button" style={{ border: "none", background: "none", color: RED_BRIGHT, cursor: "pointer", fontSize: 12 }}>
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.slice().sort((a, b) => b.ts - a.ts).map((r) => {
+                  if (editingId === r.id) {
+                    return (
+                      <tr key={r.id}>
+                        <td>
+                          <input className="vs-input" style={{ marginBottom: 0, minWidth: 140 }} value={editForm.nombre} onChange={(e) => setEditForm((f) => ({ ...f, nombre: e.target.value }))} autoFocus />
+                        </td>
+                        <td>
+                          <input className="vs-input" style={{ marginBottom: 0, width: 64, fontFamily: "'IBM Plex Mono', monospace" }} value={editForm.edad} onChange={(e) => setEditForm((f) => ({ ...f, edad: e.target.value.replace(/\D/g, "").slice(0, 3) }))} inputMode="numeric" />
+                        </td>
+                        <td>
+                          <input className="vs-input" style={{ marginBottom: 0, minWidth: 140 }} value={editForm.zona} onChange={(e) => setEditForm((f) => ({ ...f, zona: e.target.value }))} />
+                        </td>
+                        {isAdmin && <td>{r.promotor}</td>}
+                        <td>
+                          <input className="vs-input" style={{ marginBottom: 0, width: 100, fontFamily: "'IBM Plex Mono', monospace" }} value={editForm.dni} onChange={(e) => setEditForm((f) => ({ ...f, dni: e.target.value.replace(/\D/g, "") }))} inputMode="numeric" />
+                        </td>
+                        <td style={{ opacity: 0.6 }}>{new Date(r.ts).toLocaleDateString()}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <button onClick={() => saveEdit(r.id)} type="button" style={{ border: "none", background: "none", color: TEAL, cursor: "pointer", fontSize: 12, fontWeight: 600, marginRight: 10 }}>
+                            Guardar
+                          </button>
+                          <button onClick={cancelEdit} type="button" style={{ border: "none", background: "none", color: INK, opacity: 0.6, cursor: "pointer", fontSize: 12 }}>
+                            Cancelar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={r.id}>
+                      <td>{r.nombre}</td>
+                      <td style={{ fontFamily: "'IBM Plex Mono', monospace", opacity: r.edad ? 1 : 0.6 }}>{r.edad || "—"}</td>
+                      <td>{r.zona}</td>
+                      {isAdmin && <td>{r.promotor}</td>}
+                      <td style={{ fontFamily: "'IBM Plex Mono', monospace", opacity: r.dni ? 1 : 0.4 }}>{r.dni || "—"}</td>
+                      <td style={{ opacity: 0.6 }}>{new Date(r.ts).toLocaleDateString()}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button onClick={() => startEdit(r)} type="button" style={{ border: "none", background: "none", color: TEAL, cursor: "pointer", fontSize: 12, marginRight: 10 }}>
+                          Editar
+                        </button>
+                        <button onClick={() => removeRegistro(r.id)} type="button" style={{ border: "none", background: "none", color: RED_BRIGHT, cursor: "pointer", fontSize: 12 }}>
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={isAdmin ? 7 : 6} style={{ textAlign: "center", opacity: 0.5, padding: "24px 0" }}>Sin resultados.</td>
