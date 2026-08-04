@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { collection, query as firestoreQuery, orderBy, onSnapshot, setDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, query as firestoreQuery, orderBy, onSnapshot, getDocs, setDoc, deleteDoc, doc } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "./firebase";
 
 const FONTS = `
@@ -117,6 +117,7 @@ export default function ConteoVotoSeguro() {
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
   const [lastSync, setLastSync] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
   const [nombre, setNombre] = useState("");
   const [edad, setEdad] = useState("");
@@ -218,6 +219,29 @@ export default function ConteoVotoSeguro() {
       unsubscribeUsuarios();
     };
   }, [isFirebaseConfigured, loadRegistros, loadUsuarios, registrosCollection, usuariosCollection]);
+
+  const refreshNow = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (isFirebaseConfigured && registrosCollection && usuariosCollection) {
+        const registrosQuery = firestoreQuery(registrosCollection, orderBy("ts", "desc"));
+        const usuariosQuery = firestoreQuery(usuariosCollection, orderBy("nombre"));
+        const [registrosSnap, usuariosSnap] = await Promise.all([getDocs(registrosQuery), getDocs(usuariosQuery)]);
+        setRegistros(registrosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        if (!usuariosSnap.empty) {
+          setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        }
+      } else {
+        await Promise.all([loadRegistros(true), loadUsuarios()]);
+      }
+      setLastSync(new Date());
+    } catch (error_) {
+      console.error("Manual refresh error:", error_);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, isFirebaseConfigured, registrosCollection, usuariosCollection, loadRegistros, loadUsuarios]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -494,14 +518,26 @@ export default function ConteoVotoSeguro() {
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.8 }}>
                 {isAdmin ? "Administrador" : "Promotor"} · {currentUser.nombre}
               </div>
-              <button
-                onClick={() => setCurrentUser(null)}
-                type="button"
-                className="vs-btn vs-btn--secondary"
-                style={{ marginTop: 8 }}
-              >
-                Cerrar sesión
-              </button>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+                {isAdmin && (
+                  <button
+                    onClick={refreshNow}
+                    type="button"
+                    className="vs-btn vs-btn--secondary"
+                    disabled={refreshing}
+                    style={{ opacity: refreshing ? 0.7 : 1 }}
+                  >
+                    {refreshing ? "Actualizando…" : "↻ Actualizar"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setCurrentUser(null)}
+                  type="button"
+                  className="vs-btn vs-btn--secondary"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
             </div>
           </div>
 
