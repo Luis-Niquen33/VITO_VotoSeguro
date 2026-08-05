@@ -40,9 +40,9 @@ function ProgressBar({ count, max, color = RED }) {
   );
 }
 
-function GoalRing({ value, goal = 2500, size = 92 }) {
-  const pct = goal > 0 ? Math.min(value / goal, 1) : 0;
-  const reached = value >= goal;
+function GoalRing({ value, min = 2500, max = 3000, size = 92 }) {
+  const pct = max > 0 ? Math.min(value / max, 1) : 0;
+  const reached = value >= min;
   const color = reached ? TEAL : GOLD;
   const stroke = 8;
   const radius = (size - stroke) / 2;
@@ -71,8 +71,8 @@ function GoalRing({ value, goal = 2500, size = 92 }) {
           {Math.round(pct * 100)}%
         </text>
       </svg>
-      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: reached ? "#8FE0C8" : "#fff", opacity: 0.9 }}>
-        Meta {goal.toLocaleString()}
+      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: reached ? "#8FE0C8" : "#fff", opacity: 0.9, textAlign: "center" }}>
+        Meta mínima {min.toLocaleString()} a {max.toLocaleString()}
       </div>
     </div>
   );
@@ -612,7 +612,7 @@ export default function ConteoVotoSeguro() {
                 </button>
               </div>
               <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
-                <GoalRing value={registros.length} goal={2500} />
+                <GoalRing value={registros.length} min={2500} max={3000} />
               </div>
             </div>
           </div>
