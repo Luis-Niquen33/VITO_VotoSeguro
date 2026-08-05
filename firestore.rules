@@ -8,8 +8,9 @@
 //
 // Estas reglas por eso solo pueden:
 //  1) Restringir a las colecciones conocidas (todo lo demás, denegado).
-//  2) Validar la forma de los documentos al crear (evita basura o payloads
-//     gigantes) y bloquear updates/deletes que la app nunca hace.
+//  2) Validar la forma de los documentos al crear y editar (evita basura o
+//     payloads gigantes) y bloquear cambios que la app nunca hace (p.ej.
+//     reasignar id/promotor/fecha de un registro, o editar usuarios).
 //  3) Proteger la cuenta admin semilla ("admin-1") para que no se borre
 //     directamente por API.
 //
@@ -50,7 +51,17 @@ service cloud.firestore {
         request.resource.data.ts is number &&
         request.resource.data.ts <= request.time.toMillis() + 60000;
 
-      allow update: if false;
+      allow update: if
+        request.resource.data.keys().hasOnly(['id', 'nombre', 'edad', 'dni', 'zona', 'promotor', 'ts']) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.promotor == resource.data.promotor &&
+        request.resource.data.ts == resource.data.ts &&
+        isNonEmptyString(request.resource.data.nombre, 120) &&
+        isBoundedString(request.resource.data.edad, 3) &&
+        isBoundedString(request.resource.data.dni, 20) &&
+        isNonEmptyString(request.resource.data.zona, 120) &&
+        isNonEmptyString(request.resource.data.promotor, 120);
+
       allow delete: if true;
     }
 
