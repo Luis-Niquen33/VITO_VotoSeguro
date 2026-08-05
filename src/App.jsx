@@ -31,36 +31,49 @@ function uid() {
   throw new Error("Crypto API is required for UID generation");
 }
 
-// Real "palote" tally marks: groups of 5, the 5th stroke crossing the other 4.
-function TallyGroup({ n, size = 22, color = INK }) {
-  const strokes = Math.min(n, 5);
-  const positions = Array.from({ length: strokes }, (_, i) => 4 + i * 8);
+function ProgressBar({ count, max, color = RED }) {
+  const pct = max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0;
   return (
-    <svg width={size * 1.6} height={size} viewBox="0 0 40 26" style={{ overflow: "visible" }}>
-      {positions.map((x) => (
-        <line key={`stroke-${x}`} x1={x} y1={2} x2={x} y2={24} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-      ))}
-      {n >= 5 && <line x1={0} y1={22} x2={36} y2={2} stroke={color} strokeWidth={2.5} strokeLinecap="round" />}
-    </svg>
+    <div style={{ flex: 1, height: 8, borderRadius: 4, background: "#EEE3D3", overflow: "hidden" }}>
+      <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.3s ease" }} />
+    </div>
   );
 }
 
-function TallyRow({ count, color = INK, max = 60 }) {
-  const shown = Math.min(count, max);
-  const groups = Math.ceil(shown / 5) || (shown === 0 ? 0 : 1);
-  const rest = count - shown;
+function GoalRing({ value, goal = 2500, size = 92 }) {
+  const pct = goal > 0 ? Math.min(value / goal, 1) : 0;
+  const reached = value >= goal;
+  const color = reached ? TEAL : GOLD;
+  const stroke = 8;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dash = circumference * pct;
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-      {Array.from({ length: groups }).map((_, i) => {
-        const n = i === groups - 1 ? shown - i * 5 : 5;
-        return <TallyGroup key={`group-${n}-${i}`} n={n} color={color} />;
-      })}
-      {rest > 0 && (
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color, opacity: 0.7 }}>+{rest} más</span>
-      )}
-      {count === 0 && (
-        <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color, opacity: 0.5 }}>sin registros aún</span>
-      )}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ transition: "stroke-dasharray 0.4s ease" }}
+        />
+        <text x="50%" y="47%" textAnchor="middle" dominantBaseline="middle" fill="#fff" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 17, fontWeight: 700 }}>
+          {value}
+        </text>
+        <text x="50%" y="65%" textAnchor="middle" dominantBaseline="middle" fill="#fff" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, opacity: 0.85 }}>
+          {Math.round(pct * 100)}%
+        </text>
+      </svg>
+      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: reached ? "#8FE0C8" : "#fff", opacity: 0.9 }}>
+        Meta {goal.toLocaleString()}
+      </div>
     </div>
   );
 }
@@ -556,6 +569,11 @@ export default function ConteoVotoSeguro() {
     <div style={{ minHeight: "100vh", background: PAPER, fontFamily: "'IBM Plex Sans', sans-serif", color: INK }}>
       <style>{FONTS}</style>
 
+      {/* TOP BANNER */}
+      <div style={{ background: RED_DARK, color: GOLD, textAlign: "center", fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, letterSpacing: 1, textTransform: "uppercase", padding: "7px 12px" }}>
+        Apoyo a Arq. Marlón Ñiquen Torres
+      </div>
+
       {/* HERO */}
       <div className="vs-hero">
         <div className="vs-hero-inner">
@@ -592,6 +610,9 @@ export default function ConteoVotoSeguro() {
                 >
                   Cerrar sesión
                 </button>
+              </div>
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
+                <GoalRing value={registros.length} goal={2500} />
               </div>
             </div>
           </div>
@@ -651,8 +672,8 @@ export default function ConteoVotoSeguro() {
               {porZona.map(([z, n]) => (
                 <div key={z} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, borderBottom: `1px dashed ${RULE}`, paddingBottom: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, minWidth: 130 }}>{z}</span>
-                  <TallyRow count={n} max={30} color={RED} />
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: RED }}>{n}</span>
+                  <ProgressBar count={n} max={porZona[0][1]} color={RED} />
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: RED, minWidth: 22, textAlign: "right" }}>{n}</span>
                 </div>
               ))}
             </div>
@@ -666,8 +687,8 @@ export default function ConteoVotoSeguro() {
                 {porPromotor.map(([p, n]) => (
                   <div key={p} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, borderBottom: `1px dashed ${RULE}`, paddingBottom: 10 }}>
                     <span style={{ fontSize: 14, fontWeight: 500, minWidth: 130 }}>{p}</span>
-                    <TallyRow count={n} max={30} color={TEAL} />
-                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: TEAL }}>{n}</span>
+                    <ProgressBar count={n} max={porPromotor[0][1]} color={TEAL} />
+                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: TEAL, minWidth: 22, textAlign: "right" }}>{n}</span>
                   </div>
                 ))}
               </div>
