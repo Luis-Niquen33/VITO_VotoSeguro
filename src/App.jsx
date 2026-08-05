@@ -119,6 +119,8 @@ export default function ConteoVotoSeguro() {
   const [lastSync, setLastSync] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
+  const [filterPromotor, setFilterPromotor] = useState("");
+  const [filterZona, setFilterZona] = useState("");
   const [nombre, setNombre] = useState("");
   const [edad, setEdad] = useState("");
   const [dni, setDni] = useState("");
@@ -462,6 +464,11 @@ export default function ConteoVotoSeguro() {
 
   const zonas = useMemo(() => [...new Set(registrosVisibles.map((r) => r.zona))], [registrosVisibles]);
 
+  const promotores = useMemo(
+    () => [...new Set(registrosVisibles.map((r) => r.promotor))].sort((a, b) => a.localeCompare(b)),
+    [registrosVisibles]
+  );
+
   const porZona = useMemo(() => {
     const m = {};
     registrosVisibles.forEach((r) => (m[r.zona] = (m[r.zona] || 0) + 1));
@@ -476,15 +483,18 @@ export default function ConteoVotoSeguro() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return registrosVisibles;
-    return registrosVisibles.filter(
-      (r) =>
+    return registrosVisibles.filter((r) => {
+      const matchesQuery =
+        !q ||
         r.nombre.toLowerCase().includes(q) ||
         (r.dni || "").includes(q) ||
         r.zona.toLowerCase().includes(q) ||
-        r.promotor.toLowerCase().includes(q)
-    );
-  }, [registrosVisibles, query]);
+        r.promotor.toLowerCase().includes(q);
+      const matchesPromotor = !filterPromotor || r.promotor === filterPromotor;
+      const matchesZona = !filterZona || r.zona === filterZona;
+      return matchesQuery && matchesPromotor && matchesZona;
+    });
+  }, [registrosVisibles, query, filterPromotor, filterZona]);
 
   const exportCSV = () => {
     const header = "Nombre,Edad,Zona o calle,Promotor,DNI,Fecha\n";
@@ -671,6 +681,25 @@ export default function ConteoVotoSeguro() {
             <div className="vs-section-title">{isAdmin ? "Todos los registros" : "Tus registros"} ({filtered.length})</div>
             <div className="vs-toolbar">
               <input className="vs-input" style={{ marginBottom: 0 }} placeholder="Buscar por nombre, zona, calle, DNI…" value={query} onChange={(e) => setQuery(e.target.value)} />
+              {isAdmin && (
+                <select className="vs-input" style={{ marginBottom: 0, width: "auto" }} value={filterPromotor} onChange={(e) => setFilterPromotor(e.target.value)}>
+                  <option value="">Todos los promotores</option>
+                  {promotores.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              )}
+              <select className="vs-input" style={{ marginBottom: 0, width: "auto" }} value={filterZona} onChange={(e) => setFilterZona(e.target.value)}>
+                <option value="">Todas las zonas</option>
+                {zonas.map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+              {(filterPromotor || filterZona) && (
+                <button
+                  onClick={() => { setFilterPromotor(""); setFilterZona(""); }}
+                  type="button"
+                  className="vs-btn vs-btn--ghost"
+                >
+                  Limpiar filtros
+                </button>
+              )}
               <button onClick={exportCSV} type="button" className="vs-btn vs-btn--ghost">Exportar CSV</button>
             </div>
           </div>
