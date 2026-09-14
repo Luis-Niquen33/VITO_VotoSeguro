@@ -16,12 +16,12 @@ const TEAL = "#2F6B5E";
 const RULE = "#D8C9B8";
 
 const PARTIDOS = [
-  { id: "renovacion-popular", nombre: "Renovación Popular" },
-  { id: "fuerza-popular", nombre: "Fuerza Popular" },
-  { id: "avanza-pais", nombre: "Avanza País" },
-  { id: "pais-para-todos", nombre: "País para Todos" },
-  { id: "somos-peru", nombre: "Somos Perú" },
-  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano" },
+  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32" },
+  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "FP", color: "#F0A323" },
+  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", color: "#1769A8" },
+  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", color: "#2F8B67" },
+  { id: "somos-peru", nombre: "Somos Perú", sigla: "SP", color: "#6A4AA1" },
+  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "PAP", color: "#B5282D" },
 ];
 
 function emptyVotos() {
@@ -53,6 +53,33 @@ function ProgressBar({ count, max, color = RED }) {
   return (
     <div style={{ flex: 1, height: 8, borderRadius: 4, background: "#EEE3D3", overflow: "hidden" }}>
       <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.3s ease" }} />
+    </div>
+  );
+}
+
+function PartidoLogo({ partido, size = 48 }) {
+  return (
+    <div
+      aria-label={`Logo de ${partido.nombre}`}
+      title={partido.nombre}
+      style={{
+        width: size,
+        height: size,
+        flex: `0 0 ${size}px`,
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        background: partido.color,
+        color: "#fff",
+        border: "4px solid #fff",
+        boxShadow: `0 0 0 2px ${partido.color}33`,
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: size < 48 ? 10 : 12,
+        fontWeight: 700,
+        letterSpacing: 0.2,
+      }}
+    >
+      {partido.sigla}
     </div>
   );
 }
@@ -645,6 +672,26 @@ export default function ConteoVotoSeguro() {
     return Object.entries(m).sort((a, b) => b[1] - a[1]);
   }, [registros]);
 
+  const rankingPartidos = useMemo(() => {
+    const totals = Object.fromEntries(PARTIDOS.map(({ id }) => [id, 0]));
+    let blancos = 0;
+    let nulos = 0;
+    let impugnados = 0;
+    conteosMesas.forEach((conteo) => {
+      PARTIDOS.forEach(({ id }) => {
+        totals[id] += Number(conteo.votos?.[id]) || 0;
+      });
+      blancos += Number(conteo.blancos) || 0;
+      nulos += Number(conteo.nulos) || 0;
+      impugnados += Number(conteo.impugnados) || 0;
+    });
+    const ordenados = PARTIDOS
+      .map((partido) => ({ ...partido, votos: totals[partido.id] }))
+      .sort((a, b) => b.votos - a.votos);
+    const votosPartidos = ordenados.reduce((total, partido) => total + partido.votos, 0);
+    return { ordenados, blancos, nulos, impugnados, votosPartidos, total: votosPartidos + blancos + nulos + impugnados };
+  }, [conteosMesas]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return registrosVisibles.filter((r) => {
@@ -799,6 +846,73 @@ export default function ConteoVotoSeguro() {
 
       {isAdmin && activeView === "conteo" && (
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0" }}>
+        <div className="vs-panel" style={{ background: `linear-gradient(135deg, ${RED_DARK}, #7A1717)`, color: PAPER, border: "none", overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ color: GOLD, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase" }}>Dashboard de resultados</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700, marginTop: 4 }}>Quién va primero</div>
+              <div style={{ fontSize: 13, opacity: 0.78, marginTop: 5 }}>Acumulado de {conteosMesas.length} {conteosMesas.length === 1 ? "mesa registrada" : "mesas registradas"}.</div>
+            </div>
+            <div style={{ textAlign: "right", fontFamily: "'IBM Plex Mono', monospace" }}>
+              <div style={{ fontSize: 11, opacity: 0.72, textTransform: "uppercase" }}>Votos contabilizados</div>
+              <strong style={{ fontSize: 28 }}>{rankingPartidos.votosPartidos.toLocaleString()}</strong>
+            </div>
+          </div>
+
+          {rankingPartidos.votosPartidos === 0 ? (
+            <div style={{ marginTop: 22, padding: "16px 18px", border: "1px dashed rgba(255,255,255,0.35)", borderRadius: 8, fontSize: 14, opacity: 0.85 }}>
+              Ingresa los resultados de una mesa para ver el ranking.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginTop: 22 }}>
+              {rankingPartidos.ordenados.slice(0, 3).map((partido, index) => {
+                const percentage = rankingPartidos.votosPartidos ? (partido.votos / rankingPartidos.votosPartidos) * 100 : 0;
+                return (
+                  <div key={partido.id} style={{ background: index === 0 ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.08)", border: `1px solid ${index === 0 ? GOLD : "rgba(255,255,255,0.16)"}`, borderRadius: 8, padding: 15, display: "flex", alignItems: "center", gap: 12 }}>
+                    <PartidoLogo partido={partido} size={index === 0 ? 54 : 46} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: index === 0 ? GOLD : "rgba(255,255,255,0.65)", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, textTransform: "uppercase" }}>{index + 1}.° lugar</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginTop: 3 }}>{partido.nombre}</div>
+                      <strong style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 20 }}>{partido.votos.toLocaleString()}</strong>
+                      <span style={{ fontSize: 12, opacity: 0.72, marginLeft: 6 }}>{percentage.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="vs-panel" style={{ marginTop: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <div className="vs-section-title">Ranking por partido</div>
+            <div style={{ fontSize: 12, opacity: 0.62 }}>Ordenado de mayor a menor</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
+            {rankingPartidos.ordenados.map((partido, index) => {
+              const percentage = rankingPartidos.votosPartidos ? (partido.votos / rankingPartidos.votosPartidos) * 100 : 0;
+              return (
+                <div key={partido.id} style={{ display: "grid", gridTemplateColumns: "28px 48px minmax(150px, 1fr) 70px 58px", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${RULE}` }}>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, color: index === 0 && partido.votos > 0 ? RED : "#9A8A7A", textAlign: "center" }}>{index + 1}</span>
+                  <PartidoLogo partido={partido} size={38} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{partido.nombre}</div>
+                    <div style={{ height: 7, marginTop: 6, background: "#EEE3D3", borderRadius: 5, overflow: "hidden" }}><div style={{ width: `${percentage}%`, minWidth: partido.votos > 0 ? 5 : 0, height: "100%", background: partido.color, borderRadius: 5 }} /></div>
+                  </div>
+                  <strong style={{ fontFamily: "'IBM Plex Mono', monospace", textAlign: "right" }}>{partido.votos.toLocaleString()}</strong>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.62, textAlign: "right" }}>{percentage.toFixed(1)}%</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 16, paddingTop: 12, borderTop: `1px solid ${RULE}`, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: "#6D5B4B" }}>
+            <span>Blancos <b>{rankingPartidos.blancos}</b></span>
+            <span>Nulos <b>{rankingPartidos.nulos}</b></span>
+            <span>Impugnados <b>{rankingPartidos.impugnados}</b></span>
+            <span>Total actas <b>{rankingPartidos.total}</b></span>
+          </div>
+        </div>
+
         <div className="vs-panel">
           <div className="vs-section-title">Conteo oficial por mesa</div>
           <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4, marginBottom: 16 }}>
