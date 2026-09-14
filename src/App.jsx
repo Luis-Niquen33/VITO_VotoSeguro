@@ -861,6 +861,23 @@ export default function ConteoVotoSeguro() {
 
       {isAdmin && activeView === "conteo" && (
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+          {[
+            ["Total de mesas", TOTAL_MESAS, "mesas objetivo", RED],
+            ["Mesas registradas", resumenMesas.registradas, `${resumenMesas.avance.toFixed(0)}% del total`, TEAL],
+            ["Mesas pendientes", resumenMesas.pendientes, "mesas por registrar", RED_BRIGHT],
+            ["Electores contabilizados", resumenMesas.electores.toLocaleString(), "según actas ingresadas", GOLD],
+          ].map(([label, value, detail, color]) => (
+            <div key={label} className="vs-panel" style={{ padding: 18, borderTop: `5px solid ${color}` }}>
+              <div style={{ fontSize: 11, color: "#6D5B4B", textTransform: "uppercase", letterSpacing: 0.7 }}>{label}</div>
+              <strong style={{ display: "block", marginTop: 7, color, fontFamily: "'IBM Plex Mono', monospace", fontSize: 30, lineHeight: 1 }}>{value}</strong>
+              <div style={{ marginTop: 7, fontSize: 12, color: "#806F5E" }}>{detail}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 14, height: 10, background: "#E8DCCB", borderRadius: 6, overflow: "hidden" }} title={`${resumenMesas.avance.toFixed(0)}% de mesas registradas`}>
+          <div style={{ width: `${resumenMesas.avance}%`, height: "100%", background: TEAL, borderRadius: 6, transition: "width 0.3s ease" }} />
+        </div>
         <div className="vs-panel" style={{ order: 2, marginTop: 20, background: `linear-gradient(135deg, ${RED_DARK}, #7A1717)`, color: PAPER, border: "none", overflow: "hidden" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
             <div>
@@ -872,25 +889,6 @@ export default function ConteoVotoSeguro() {
               <div style={{ fontSize: 11, opacity: 0.72, textTransform: "uppercase" }}>Votos contabilizados</div>
               <strong style={{ fontSize: 28 }}>{rankingPartidos.votosPartidos.toLocaleString()}</strong>
             </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 22 }}>
-            {[
-              ["Total de mesas", TOTAL_MESAS, "objetivo"],
-              ["Mesas registradas", resumenMesas.registradas, `${resumenMesas.avance.toFixed(0)}% avance`],
-              ["Mesas pendientes", resumenMesas.pendientes, "por registrar"],
-              ["Electores contabilizados", resumenMesas.electores.toLocaleString(), "según actas"],
-            ].map(([label, value, detail]) => (
-              <div key={label} style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)" }}>
-                <div style={{ fontSize: 10, opacity: 0.72, textTransform: "uppercase", letterSpacing: 0.6 }}>{label}</div>
-                <strong style={{ display: "block", marginTop: 4, fontFamily: "'IBM Plex Mono', monospace", fontSize: 24 }}>{value}</strong>
-                <div style={{ fontSize: 11, opacity: 0.68, marginTop: 2 }}>{detail}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 14, height: 9, background: "rgba(255,255,255,0.18)", borderRadius: 6, overflow: "hidden" }} title={`${resumenMesas.avance.toFixed(0)}% de mesas registradas`}>
-            <div style={{ width: `${resumenMesas.avance}%`, height: "100%", background: GOLD, borderRadius: 6, transition: "width 0.3s ease" }} />
           </div>
 
           {rankingPartidos.votosPartidos === 0 ? (
