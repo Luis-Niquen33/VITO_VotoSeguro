@@ -14,6 +14,7 @@ const RED_BRIGHT = "#C81E1E";
 const GOLD = "#D9A441";
 const TEAL = "#2F6B5E";
 const RULE = "#D8C9B8";
+const TOTAL_MESAS = 34;
 
 const PARTIDOS = [
   { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32" },
@@ -692,6 +693,14 @@ export default function ConteoVotoSeguro() {
     return { ordenados, blancos, nulos, impugnados, votosPartidos, total: votosPartidos + blancos + nulos + impugnados };
   }, [conteosMesas]);
 
+  const resumenMesas = useMemo(() => {
+    const registradas = conteosMesas.length;
+    const pendientes = Math.max(TOTAL_MESAS - registradas, 0);
+    const avance = TOTAL_MESAS > 0 ? Math.min((registradas / TOTAL_MESAS) * 100, 100) : 0;
+    const electores = conteosMesas.reduce((total, conteo) => total + (Number(conteo.electores) || 0), 0);
+    return { registradas, pendientes, avance, electores };
+  }, [conteosMesas]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return registrosVisibles.filter((r) => {
@@ -863,6 +872,25 @@ export default function ConteoVotoSeguro() {
               <div style={{ fontSize: 11, opacity: 0.72, textTransform: "uppercase" }}>Votos contabilizados</div>
               <strong style={{ fontSize: 28 }}>{rankingPartidos.votosPartidos.toLocaleString()}</strong>
             </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 22 }}>
+            {[
+              ["Total de mesas", TOTAL_MESAS, "objetivo"],
+              ["Mesas registradas", resumenMesas.registradas, `${resumenMesas.avance.toFixed(0)}% avance`],
+              ["Mesas pendientes", resumenMesas.pendientes, "por registrar"],
+              ["Electores contabilizados", resumenMesas.electores.toLocaleString(), "según actas"],
+            ].map(([label, value, detail]) => (
+              <div key={label} style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)" }}>
+                <div style={{ fontSize: 10, opacity: 0.72, textTransform: "uppercase", letterSpacing: 0.6 }}>{label}</div>
+                <strong style={{ display: "block", marginTop: 4, fontFamily: "'IBM Plex Mono', monospace", fontSize: 24 }}>{value}</strong>
+                <div style={{ fontSize: 11, opacity: 0.68, marginTop: 2 }}>{detail}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 14, height: 9, background: "rgba(255,255,255,0.18)", borderRadius: 6, overflow: "hidden" }} title={`${resumenMesas.avance.toFixed(0)}% de mesas registradas`}>
+            <div style={{ width: `${resumenMesas.avance}%`, height: "100%", background: GOLD, borderRadius: 6, transition: "width 0.3s ease" }} />
           </div>
 
           {rankingPartidos.votosPartidos === 0 ? (
