@@ -17,12 +17,12 @@ const RULE = "#D8C9B8";
 const TOTAL_MESAS = 34;
 
 const PARTIDOS = [
-  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32" },
-  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "FP", color: "#F0A323" },
-  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", color: "#1769A8" },
-  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", color: "#2F8B67" },
-  { id: "somos-peru", nombre: "Somos Perú", sigla: "SP", color: "#6A4AA1" },
-  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "PAP", color: "#B5282D" },
+  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Renovaci%C3%B3n%20Popular%20logo.svg?width=96" },
+  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "FP", color: "#F0A323", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Fuerza%20Popular%20logo.svg?width=96" },
+  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", color: "#1769A8", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Avanza%20Pa%C3%ADs%20Logo%202017-20.jpg?width=96" },
+  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", color: "#2F8B67", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Pa%C3%ADs%20para%20Todos%20logo.svg?width=96" },
+  { id: "somos-peru", nombre: "Somos Perú", sigla: "SP", color: "#6A4AA1", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Somos%20Per%C3%BA%20logo.svg?width=96" },
+  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "PAP", color: "#B5282D", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/APRA%20logo.svg?width=96" },
 ];
 
 function emptyVotos() {
@@ -80,6 +80,14 @@ function PartidoLogo({ partido, size = 48 }) {
         letterSpacing: 0.2,
       }}
     >
+      {partido.logoUrl && (
+        <img
+          src={partido.logoUrl}
+          alt=""
+          onError={(event) => { event.currentTarget.style.display = "none"; }}
+          style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "50%", background: "#fff" }}
+        />
+      )}
       {partido.sigla}
     </div>
   );
@@ -461,10 +469,11 @@ export default function ConteoVotoSeguro() {
       return;
     }
     const toCount = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
+    const totalElectores = totalConteo({ votos: votosMesa, blancos: blancosMesa, nulos: nulosMesa, impugnados: impugnadosMesa });
     const conteo = {
       mesa: mesaClean,
       local: localMesa.trim() || "Sin local registrado",
-      electores: toCount(electoresMesa),
+      electores: totalElectores,
       votos: Object.fromEntries(PARTIDOS.map(({ id }) => [id, toCount(votosMesa[id])])),
       blancos: toCount(blancosMesa),
       nulos: toCount(nulosMesa),
@@ -962,7 +971,7 @@ export default function ConteoVotoSeguro() {
               </div>
               <div>
                 <label htmlFor="conteo-electores" style={labelStyle}>Electores</label>
-                <input id="conteo-electores" className="vs-input" value={electoresMesa} onChange={(e) => setElectoresMesa(e.target.value.replace(/\D/g, ""))} placeholder="Total" inputMode="numeric" />
+                <input id="conteo-electores" className="vs-input" value={totalConteo({ votos: votosMesa, blancos: blancosMesa, nulos: nulosMesa, impugnados: impugnadosMesa })} placeholder="Se calcula automáticamente" inputMode="numeric" readOnly style={{ background: "#F2ECE0", color: TEAL, fontWeight: 700 }} />
               </div>
             </div>
 
