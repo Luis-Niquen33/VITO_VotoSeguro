@@ -781,11 +781,13 @@ export default function ConteoVotoSeguro() {
                 Ciudad Eten
               </div>
               <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 30, margin: 0 }}>
-                Conteo de Voto Seguro
+                {activeView === "conteo" ? "Conteo por mesa" : "Conteo de Voto Seguro"}
               </h1>
-              <div style={{ marginTop: 8, fontSize: 14, opacity: 0.9, maxWidth: 560 }}>
-                Registro rápido para promotores, resumen por zona y exportación sencilla para el cierre de jornada.
-              </div>
+              {activeView === "dashboard" && (
+                <div style={{ marginTop: 8, fontSize: 14, opacity: 0.9, maxWidth: 560 }}>
+                  Registro rápido para promotores, resumen por zona y exportación sencilla para el cierre de jornada.
+                </div>
+              )}
             </div>
             <div className="vs-hero-user">
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.8 }}>
@@ -821,32 +823,36 @@ export default function ConteoVotoSeguro() {
                   Cerrar sesión
                 </button>
               </div>
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
-                <GoalRing value={registros.length} min={2500} max={3000} />
-              </div>
+              {activeView === "dashboard" && (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
+                  <GoalRing value={registros.length} min={2500} max={3000} />
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="vs-hero-stats">
-            <div className="vs-stat-card">
-              <div className="vs-stat-label">Votos visibles</div>
-              <strong>{registrosVisibles.length}</strong>
+          {activeView === "dashboard" && (
+            <div className="vs-hero-stats">
+              <div className="vs-stat-card">
+                <div className="vs-stat-label">Votos visibles</div>
+                <strong>{registrosVisibles.length}</strong>
+              </div>
+              <div className="vs-stat-card">
+                <div className="vs-stat-label">Zonas registradas</div>
+                <strong>{zonas.length}</strong>
+              </div>
+              <div className="vs-stat-card">
+                <div className="vs-stat-label">Última sincronización</div>
+                <strong>{lastSync ? lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</strong>
+              </div>
             </div>
-            <div className="vs-stat-card">
-              <div className="vs-stat-label">Zonas registradas</div>
-              <strong>{zonas.length}</strong>
-            </div>
-            <div className="vs-stat-card">
-              <div className="vs-stat-label">Última sincronización</div>
-              <strong>{lastSync ? lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</strong>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       {isAdmin && activeView === "conteo" && (
-        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0" }}>
-        <div className="vs-panel" style={{ background: `linear-gradient(135deg, ${RED_DARK}, #7A1717)`, color: PAPER, border: "none", overflow: "hidden" }}>
+        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0", display: "flex", flexDirection: "column" }}>
+        <div className="vs-panel" style={{ order: 2, marginTop: 20, background: `linear-gradient(135deg, ${RED_DARK}, #7A1717)`, color: PAPER, border: "none", overflow: "hidden" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div style={{ color: GOLD, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase" }}>Dashboard de resultados</div>
@@ -883,7 +889,7 @@ export default function ConteoVotoSeguro() {
           )}
         </div>
 
-        <div className="vs-panel" style={{ marginTop: 20 }}>
+        <div className="vs-panel" style={{ order: 2, marginTop: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <div className="vs-section-title">Ranking por partido</div>
             <div style={{ fontSize: 12, opacity: 0.62 }}>Ordenado de mayor a menor</div>
