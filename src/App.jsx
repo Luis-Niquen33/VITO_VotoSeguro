@@ -781,7 +781,7 @@ export default function ConteoVotoSeguro() {
                 Ciudad Eten
               </div>
               <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 30, margin: 0 }}>
-                {activeView === "conteo" ? "Conteo por mesa" : "Conteo de Voto Seguro"}
+                {activeView === "conteo" ? "Conteo de votos por mesas" : "Conteo de Voto Seguro"}
               </h1>
               {activeView === "dashboard" && (
                 <div style={{ marginTop: 8, fontSize: 14, opacity: 0.9, maxWidth: 560 }}>
@@ -987,8 +987,8 @@ export default function ConteoVotoSeguro() {
                     <td>{conteo.nulos || 0}</td>
                     <td style={{ fontWeight: 700 }}>{totalConteo(conteo)}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      <button onClick={() => editConteoMesa(conteo)} type="button" className="vs-btn vs-btn--secondary" style={{ color: TEAL, padding: "6px 10px", marginRight: 8 }}>Editar</button>
-                      <button onClick={() => removeConteoMesa(conteo.id)} type="button" className="vs-btn vs-btn--secondary" style={{ color: RED_BRIGHT, padding: "6px 10px" }}>Eliminar</button>
+                      <button onClick={() => editConteoMesa(conteo)} type="button" className="vs-btn vs-btn--secondary" style={{ color: TEAL, padding: "6px 10px", marginRight: 8 }}>Editar mesa</button>
+                      <button onClick={() => removeConteoMesa(conteo.id)} type="button" className="vs-btn vs-btn--secondary" style={{ color: RED_BRIGHT, padding: "6px 10px" }}>Eliminar mesa</button>
                     </td>
                   </tr>
                 ))}
