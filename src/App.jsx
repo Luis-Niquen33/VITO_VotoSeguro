@@ -484,6 +484,7 @@ export default function ConteoVotoSeguro() {
 
   const removeConteoMesa = async (id) => {
     if (currentUser?.rol !== "admin") return;
+    if (!window.confirm("¿Eliminar este conteo de mesa? Esta acción no se puede deshacer.")) return;
     try {
       if (isFirebaseConfigured) {
         await deleteDoc(doc(conteosMesasCollection, id));
@@ -842,7 +843,7 @@ export default function ConteoVotoSeguro() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
               <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13 }}>Total contabilizado: <b>{totalConteo({ votos: votosMesa, blancos: blancosMesa, nulos: nulosMesa, impugnados: impugnadosMesa })}</b></span>
-              <button className="vs-btn vs-btn--primary" type="submit" disabled={savingMesa}>{savingMesa ? "Guardando…" : "Guardar conteo de mesa"}</button>
+              <button className="vs-btn vs-btn--primary" type="submit" disabled={savingMesa}>{savingMesa ? "Guardando…" : conteosMesas.some((item) => item.mesa === mesa.trim()) ? "Actualizar conteo" : "Guardar conteo de mesa"}</button>
             </div>
             {mesaMsg && <div style={{ marginTop: 10, fontSize: 13, color: mesaMsg.startsWith("✓") ? TEAL : RED_BRIGHT }}>{mesaMsg}</div>}
           </form>
@@ -853,7 +854,7 @@ export default function ConteoVotoSeguro() {
           <div style={{ overflowX: "auto", marginTop: 10 }}>
             <table className="vs-table">
               <thead>
-                <tr><th>Mesa</th><th>Local</th><th>Electores</th>{PARTIDOS.map(({ id, nombre: partido }) => <th key={id}>{partido}</th>)}<th>Blancos</th><th>Nulos</th><th>Total</th><th></th></tr>
+                <tr><th>Mesa</th><th>Local</th><th>Electores</th>{PARTIDOS.map(({ id, nombre: partido }) => <th key={id}>{partido}</th>)}<th>Blancos</th><th>Nulos</th><th>Total</th><th>Acciones</th></tr>
               </thead>
               <tbody>
                 {conteosMesas.slice().sort((a, b) => Number(a.mesa) - Number(b.mesa)).map((conteo) => (
@@ -866,8 +867,8 @@ export default function ConteoVotoSeguro() {
                     <td>{conteo.nulos || 0}</td>
                     <td style={{ fontWeight: 700 }}>{totalConteo(conteo)}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      <button onClick={() => editConteoMesa(conteo)} type="button" style={{ border: "none", background: "none", color: TEAL, cursor: "pointer", fontSize: 12, marginRight: 8 }}>Editar</button>
-                      <button onClick={() => removeConteoMesa(conteo.id)} type="button" style={{ border: "none", background: "none", color: RED_BRIGHT, cursor: "pointer", fontSize: 12 }}>Eliminar</button>
+                      <button onClick={() => editConteoMesa(conteo)} type="button" className="vs-btn vs-btn--secondary" style={{ color: TEAL, padding: "6px 10px", marginRight: 8 }}>Editar</button>
+                      <button onClick={() => removeConteoMesa(conteo.id)} type="button" className="vs-btn vs-btn--secondary" style={{ color: RED_BRIGHT, padding: "6px 10px" }}>Eliminar</button>
                     </td>
                   </tr>
                 ))}
