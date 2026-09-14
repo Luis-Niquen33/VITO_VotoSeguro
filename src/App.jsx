@@ -142,7 +142,7 @@ function isPotentialDuplicate(newEntry, existing) {
 export default function ConteoVotoSeguro() {
   const [registros, setRegistros] = useState([]);
   const [conteosMesas, setConteosMesas] = useState([]);
-  const [usuarios, setUsuarios] = useState(null); // null = aún no cargado
+  const [usuarios, setUsuarios] = useState([DEFAULT_ADMIN]);
   const [currentUser, setCurrentUser] = useState(null);
   const [loginUser, setLoginUser] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -275,6 +275,7 @@ export default function ConteoVotoSeguro() {
       },
       (error) => {
         console.error("Firestore usuarios snapshot error:", error);
+        setUsuarios((current) => (current?.length ? current : [DEFAULT_ADMIN]));
       }
     );
 
@@ -331,10 +332,7 @@ export default function ConteoVotoSeguro() {
     try {
       let list = usuarios || [DEFAULT_ADMIN];
       if (isFirebaseConfigured) {
-        if (!usuarios) {
-          setLoginError("Cargando usuarios... espera unos segundos e intenta de nuevo.");
-          return;
-        }
+        // The seeded admin keeps login available while Firestore reconnects.
       } else {
         const fresh = await window.storage.get("usuarios", true).catch(() => null);
         list = fresh?.value ? JSON.parse(fresh.value) : usuarios || [DEFAULT_ADMIN];
