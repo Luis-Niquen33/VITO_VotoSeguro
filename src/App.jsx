@@ -149,6 +149,7 @@ export default function ConteoVotoSeguro() {
   const [loginError, setLoginError] = useState("");
   const [lastSync, setLastSync] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeView, setActiveView] = useState("dashboard");
   const [query, setQuery] = useState("");
   const [filterPromotor, setFilterPromotor] = useState("");
   const [filterZona, setFilterZona] = useState("");
@@ -219,7 +220,7 @@ export default function ConteoVotoSeguro() {
   }, [isFirebaseConfigured]);
 
   const loadConteosMesas = useCallback(async () => {
-    if (isFirebaseConfigured) return;
+    if (isFirebaseConfigured || currentUser?.rol !== "admin") return;
     try {
       const res = await window.storage.get("conteo_mesas", true);
       const parsed = res?.value ? JSON.parse(res.value) : [];
@@ -228,22 +229,26 @@ export default function ConteoVotoSeguro() {
       console.warn("Error loading conteos por mesa:", error_);
       setConteosMesas([]);
     }
-  }, [isFirebaseConfigured]);
+  }, [currentUser, isFirebaseConfigured]);
 
   useEffect(() => {
+    if (!currentUser) return;
+
     if (!isFirebaseConfigured) {
       loadRegistros(false);
       loadUsuarios();
-      loadConteosMesas();
-      const t = setInterval(() => loadRegistros(true), 6000);
+      if (currentUser.rol === "admin") loadConteosMesas();
+      const t = setInterval(() => {
+        loadRegistros(true);
+        if (currentUser.rol === "admin") loadConteosMesas();
+      }, 6000);
       return () => clearInterval(t);
     }
 
-    if (!registrosCollection || !usuariosCollection || !conteosMesasCollection) return;
+    if (!registrosCollection || !usuariosCollection) return;
 
     const registrosQuery = firestoreQuery(registrosCollection, orderBy("ts", "desc"));
     const usuariosQuery = firestoreQuery(usuariosCollection, orderBy("nombre"));
-    const conteosMesasQuery = firestoreQuery(conteosMesasCollection, orderBy("ts", "desc"));
 
     const unsubscribeRegistros = onSnapshot(
       registrosQuery,
@@ -273,35 +278,44 @@ export default function ConteoVotoSeguro() {
       }
     );
 
-    const unsubscribeConteosMesas = onSnapshot(
-      conteosMesasQuery,
-      (snapshot) => setConteosMesas(snapshot.docs.map((doc_) => ({ id: doc_.id, ...doc_.data() }))),
-      (error) => console.error("Firestore conteo_mesas snapshot error:", error)
-    );
+    let unsubscribeConteosMesas = () => {};
+    if (currentUser.rol === "admin" && conteosMesasCollection) {
+      const conteosMesasQuery = firestoreQuery(conteosMesasCollection, orderBy("ts", "desc"));
+      unsubscribeConteosMesas = onSnapshot(
+        conteosMesasQuery,
+        (snapshot) => setConteosMesas(snapshot.docs.map((doc_) => ({ id: doc_.id, ...doc_.data() }))),
+        (error) => console.error("Firestore conteo_mesas snapshot error:", error)
+      );
+    } else {
+      setConteosMesas([]);
+    }
 
     return () => {
       unsubscribeRegistros();
       unsubscribeUsuarios();
       unsubscribeConteosMesas();
     };
-  }, [isFirebaseConfigured, loadRegistros, loadUsuarios, loadConteosMesas, registrosCollection, usuariosCollection, conteosMesasCollection]);
+  }, [currentUser, isFirebaseConfigured, loadRegistros, loadUsuarios, loadConteosMesas, registrosCollection, usuariosCollection, conteosMesasCollection]);
 
   const refreshNow = useCallback(async () => {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      if (isFirebaseConfigured && registrosCollection && usuariosCollection && conteosMesasCollection) {
+      if (isFirebaseConfigured && registrosCollection && usuariosCollection) {
         const registrosQuery = firestoreQuery(registrosCollection, orderBy("ts", "desc"));
         const usuariosQuery = firestoreQuery(usuariosCollection, orderBy("nombre"));
-        const conteosMesasQuery = firestoreQuery(conteosMesasCollection, orderBy("ts", "desc"));
-        const [registrosSnap, usuariosSnap, conteosMesasSnap] = await Promise.all([getDocs(registrosQuery), getDocs(usuariosQuery), getDocs(conteosMesasQuery)]);
+        const [registrosSnap, usuariosSnap] = await Promise.all([getDocs(registrosQuery), getDocs(usuariosQuery)]);
         setRegistros(registrosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setConteosMesas(conteosMesasSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        if (currentUser.rol === "admin" && conteosMesasCollection) {
+          const conteosMesasQuery = firestoreQuery(conteosMesasCollection, orderBy("ts", "desc"));
+          const conteosMesasSnap = await getDocs(conteosMesasQuery);
+          setConteosMesas(conteosMesasSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        }
         if (!usuariosSnap.empty) {
           setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         }
       } else {
-        await Promise.all([loadRegistros(true), loadUsuarios(), loadConteosMesas()]);
+        await Promise.all([loadRegistros(true), loadUsuarios(), currentUser.rol === "admin" ? loadConteosMesas() : Promise.resolve()]);
       }
       setLastSync(new Date());
     } catch (error_) {
@@ -309,7 +323,7 @@ export default function ConteoVotoSeguro() {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing, isFirebaseConfigured, registrosCollection, usuariosCollection, conteosMesasCollection, loadRegistros, loadUsuarios, loadConteosMesas]);
+  }, [refreshing, currentUser, isFirebaseConfigured, registrosCollection, usuariosCollection, conteosMesasCollection, loadRegistros, loadUsuarios, loadConteosMesas]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -331,6 +345,7 @@ export default function ConteoVotoSeguro() {
         return;
       }
       setUsuarios(list);
+      setActiveView("dashboard");
       setCurrentUser(match);
       setLoginUser("");
       setLoginPass("");
@@ -412,6 +427,7 @@ export default function ConteoVotoSeguro() {
 
   const saveConteoMesa = async (e) => {
     e.preventDefault();
+    if (currentUser?.rol !== "admin") return;
     setMesaMsg("");
     const mesaClean = mesa.trim();
     if (!mesaClean) {
@@ -456,6 +472,7 @@ export default function ConteoVotoSeguro() {
   };
 
   const editConteoMesa = (conteo) => {
+    if (currentUser?.rol !== "admin") return;
     setMesa(conteo.mesa);
     setLocalMesa(conteo.local || "");
     setElectoresMesa(String(conteo.electores || ""));
@@ -468,6 +485,7 @@ export default function ConteoVotoSeguro() {
   };
 
   const removeConteoMesa = async (id) => {
+    if (currentUser?.rol !== "admin") return;
     try {
       if (isFirebaseConfigured) {
         await deleteDoc(doc(conteosMesasCollection, id));
@@ -737,8 +755,20 @@ export default function ConteoVotoSeguro() {
                 >
                   {refreshing ? "Actualizando…" : "↻ Actualizar"}
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setActiveView((view) => (view === "conteo" ? "dashboard" : "conteo"))}
+                    type="button"
+                    className="vs-btn vs-btn--secondary"
+                  >
+                    {activeView === "conteo" ? "← Resumen" : "Conteo por mesa"}
+                  </button>
+                )}
                 <button
-                  onClick={() => setCurrentUser(null)}
+                  onClick={() => {
+                    setActiveView("dashboard");
+                    setCurrentUser(null);
+                  }}
                   type="button"
                   className="vs-btn vs-btn--secondary"
                 >
@@ -768,7 +798,8 @@ export default function ConteoVotoSeguro() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0" }}>
+      {isAdmin && activeView === "conteo" && (
+        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0" }}>
         <div className="vs-panel">
           <div className="vs-section-title">Conteo oficial por mesa</div>
           <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4, marginBottom: 16 }}>
@@ -847,9 +878,11 @@ export default function ConteoVotoSeguro() {
             </table>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
-      <div className="vs-grid" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 60px", display: "grid", gridTemplateColumns: "minmax(280px, 340px) 1fr", gap: 24 }}>
+      {activeView === "dashboard" && (
+        <div className="vs-grid" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 60px", display: "grid", gridTemplateColumns: "minmax(280px, 340px) 1fr", gap: 24 }}>
         {/* FORM */}
         <form onSubmit={addRegistro} className="vs-panel" style={{ alignSelf: "start" }} noValidate>
           <div className="vs-section-title" style={{ marginBottom: 14 }}>
@@ -1061,7 +1094,8 @@ export default function ConteoVotoSeguro() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
