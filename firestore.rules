@@ -65,6 +65,33 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    match /conteo_mesas/{conteoId} {
+      allow read: if true;
+
+      allow create, update: if
+        request.resource.data.keys().hasOnly(['id', 'mesa', 'local', 'electores', 'votos', 'blancos', 'nulos', 'impugnados', 'responsable', 'ts']) &&
+        request.resource.data.id == conteoId &&
+        isNonEmptyString(request.resource.data.mesa, 12) &&
+        isNonEmptyString(request.resource.data.local, 160) &&
+        request.resource.data.electores is int && request.resource.data.electores >= 0 &&
+        request.resource.data.votos is map &&
+        request.resource.data.votos.keys().hasOnly(['renovacion-popular', 'fuerza-popular', 'avanza-pais', 'pais-para-todos', 'somos-peru', 'partido-aprista-peruano']) &&
+        request.resource.data.votos['renovacion-popular'] is int && request.resource.data.votos['renovacion-popular'] >= 0 &&
+        request.resource.data.votos['fuerza-popular'] is int && request.resource.data.votos['fuerza-popular'] >= 0 &&
+        request.resource.data.votos['avanza-pais'] is int && request.resource.data.votos['avanza-pais'] >= 0 &&
+        request.resource.data.votos['pais-para-todos'] is int && request.resource.data.votos['pais-para-todos'] >= 0 &&
+        request.resource.data.votos['somos-peru'] is int && request.resource.data.votos['somos-peru'] >= 0 &&
+        request.resource.data.votos['partido-aprista-peruano'] is int && request.resource.data.votos['partido-aprista-peruano'] >= 0 &&
+        request.resource.data.blancos is int && request.resource.data.blancos >= 0 &&
+        request.resource.data.nulos is int && request.resource.data.nulos >= 0 &&
+        request.resource.data.impugnados is int && request.resource.data.impugnados >= 0 &&
+        isNonEmptyString(request.resource.data.responsable, 120) &&
+        request.resource.data.ts is number &&
+        request.resource.data.ts <= request.time.toMillis() + 60000;
+
+      allow delete: if true;
+    }
+
     match /usuarios/{userId} {
       allow read: if true;
 

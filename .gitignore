@@ -1,4 +1,5 @@
 node_modules
 dist
 .env
+firebase-debug.log
 .DS_Store

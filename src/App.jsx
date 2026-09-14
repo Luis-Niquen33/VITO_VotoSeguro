@@ -15,6 +15,23 @@ const GOLD = "#D9A441";
 const TEAL = "#2F6B5E";
 const RULE = "#D8C9B8";
 
+const PARTIDOS = [
+  { id: "renovacion-popular", nombre: "Renovación Popular" },
+  { id: "fuerza-popular", nombre: "Fuerza Popular" },
+  { id: "avanza-pais", nombre: "Avanza País" },
+  { id: "pais-para-todos", nombre: "País para Todos" },
+  { id: "somos-peru", nombre: "Somos Perú" },
+  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano" },
+];
+
+function emptyVotos() {
+  return Object.fromEntries(PARTIDOS.map(({ id }) => [id, ""]));
+}
+
+function totalConteo(conteo) {
+  return PARTIDOS.reduce((total, { id }) => total + (Number(conteo.votos?.[id]) || 0), 0) + (Number(conteo.blancos) || 0) + (Number(conteo.nulos) || 0) + (Number(conteo.impugnados) || 0);
+}
+
 function uid() {
   if (typeof crypto !== "undefined") {
     if (typeof crypto.randomUUID === "function") {
@@ -124,6 +141,7 @@ function isPotentialDuplicate(newEntry, existing) {
 
 export default function ConteoVotoSeguro() {
   const [registros, setRegistros] = useState([]);
+  const [conteosMesas, setConteosMesas] = useState([]);
   const [usuarios, setUsuarios] = useState(null); // null = aún no cargado
   const [currentUser, setCurrentUser] = useState(null);
   const [loginUser, setLoginUser] = useState("");
@@ -142,6 +160,15 @@ export default function ConteoVotoSeguro() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ nombre: "", edad: "", dni: "", zona: "" });
+  const [mesa, setMesa] = useState("");
+  const [localMesa, setLocalMesa] = useState("");
+  const [electoresMesa, setElectoresMesa] = useState("");
+  const [votosMesa, setVotosMesa] = useState(emptyVotos);
+  const [blancosMesa, setBlancosMesa] = useState("");
+  const [nulosMesa, setNulosMesa] = useState("");
+  const [impugnadosMesa, setImpugnadosMesa] = useState("");
+  const [mesaMsg, setMesaMsg] = useState("");
+  const [savingMesa, setSavingMesa] = useState(false);
 
   // Panel de gestión de usuarios (admin)
   const [nuevoUsuario, setNuevoUsuario] = useState("");
@@ -152,6 +179,7 @@ export default function ConteoVotoSeguro() {
 
   const registrosCollection = db ? collection(db, "registros") : null;
   const usuariosCollection = db ? collection(db, "usuarios") : null;
+  const conteosMesasCollection = db ? collection(db, "conteo_mesas") : null;
 
   const loadRegistros = useCallback(async (silent) => {
     if (isFirebaseConfigured) return;
@@ -190,18 +218,32 @@ export default function ConteoVotoSeguro() {
     }
   }, [isFirebaseConfigured]);
 
+  const loadConteosMesas = useCallback(async () => {
+    if (isFirebaseConfigured) return;
+    try {
+      const res = await window.storage.get("conteo_mesas", true);
+      const parsed = res?.value ? JSON.parse(res.value) : [];
+      setConteosMesas(Array.isArray(parsed) ? parsed : []);
+    } catch (error_) {
+      console.warn("Error loading conteos por mesa:", error_);
+      setConteosMesas([]);
+    }
+  }, [isFirebaseConfigured]);
+
   useEffect(() => {
     if (!isFirebaseConfigured) {
       loadRegistros(false);
       loadUsuarios();
+      loadConteosMesas();
       const t = setInterval(() => loadRegistros(true), 6000);
       return () => clearInterval(t);
     }
 
-    if (!registrosCollection || !usuariosCollection) return;
+    if (!registrosCollection || !usuariosCollection || !conteosMesasCollection) return;
 
     const registrosQuery = firestoreQuery(registrosCollection, orderBy("ts", "desc"));
     const usuariosQuery = firestoreQuery(usuariosCollection, orderBy("nombre"));
+    const conteosMesasQuery = firestoreQuery(conteosMesasCollection, orderBy("ts", "desc"));
 
     const unsubscribeRegistros = onSnapshot(
       registrosQuery,
@@ -231,26 +273,35 @@ export default function ConteoVotoSeguro() {
       }
     );
 
+    const unsubscribeConteosMesas = onSnapshot(
+      conteosMesasQuery,
+      (snapshot) => setConteosMesas(snapshot.docs.map((doc_) => ({ id: doc_.id, ...doc_.data() }))),
+      (error) => console.error("Firestore conteo_mesas snapshot error:", error)
+    );
+
     return () => {
       unsubscribeRegistros();
       unsubscribeUsuarios();
+      unsubscribeConteosMesas();
     };
-  }, [isFirebaseConfigured, loadRegistros, loadUsuarios, registrosCollection, usuariosCollection]);
+  }, [isFirebaseConfigured, loadRegistros, loadUsuarios, loadConteosMesas, registrosCollection, usuariosCollection, conteosMesasCollection]);
 
   const refreshNow = useCallback(async () => {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      if (isFirebaseConfigured && registrosCollection && usuariosCollection) {
+      if (isFirebaseConfigured && registrosCollection && usuariosCollection && conteosMesasCollection) {
         const registrosQuery = firestoreQuery(registrosCollection, orderBy("ts", "desc"));
         const usuariosQuery = firestoreQuery(usuariosCollection, orderBy("nombre"));
-        const [registrosSnap, usuariosSnap] = await Promise.all([getDocs(registrosQuery), getDocs(usuariosQuery)]);
+        const conteosMesasQuery = firestoreQuery(conteosMesasCollection, orderBy("ts", "desc"));
+        const [registrosSnap, usuariosSnap, conteosMesasSnap] = await Promise.all([getDocs(registrosQuery), getDocs(usuariosQuery), getDocs(conteosMesasQuery)]);
         setRegistros(registrosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setConteosMesas(conteosMesasSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         if (!usuariosSnap.empty) {
           setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         }
       } else {
-        await Promise.all([loadRegistros(true), loadUsuarios()]);
+        await Promise.all([loadRegistros(true), loadUsuarios(), loadConteosMesas()]);
       }
       setLastSync(new Date());
     } catch (error_) {
@@ -258,7 +309,7 @@ export default function ConteoVotoSeguro() {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing, isFirebaseConfigured, registrosCollection, usuariosCollection, loadRegistros, loadUsuarios]);
+  }, [refreshing, isFirebaseConfigured, registrosCollection, usuariosCollection, conteosMesasCollection, loadRegistros, loadUsuarios, loadConteosMesas]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -346,6 +397,89 @@ export default function ConteoVotoSeguro() {
       setFormMsg("Error al guardar. Intenta de nuevo.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resetMesaForm = () => {
+    setMesa("");
+    setLocalMesa("");
+    setElectoresMesa("");
+    setVotosMesa(emptyVotos());
+    setBlancosMesa("");
+    setNulosMesa("");
+    setImpugnadosMesa("");
+  };
+
+  const saveConteoMesa = async (e) => {
+    e.preventDefault();
+    setMesaMsg("");
+    const mesaClean = mesa.trim();
+    if (!mesaClean) {
+      setMesaMsg("El número de mesa es obligatorio.");
+      return;
+    }
+    const toCount = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
+    const conteo = {
+      mesa: mesaClean,
+      local: localMesa.trim() || "Sin local registrado",
+      electores: toCount(electoresMesa),
+      votos: Object.fromEntries(PARTIDOS.map(({ id }) => [id, toCount(votosMesa[id])])),
+      blancos: toCount(blancosMesa),
+      nulos: toCount(nulosMesa),
+      impugnados: toCount(impugnadosMesa),
+      responsable: currentUser.nombre,
+      ts: Date.now(),
+    };
+    setSavingMesa(true);
+    try {
+      const current = isFirebaseConfigured
+        ? conteosMesas
+        : await window.storage.get("conteo_mesas", true).then((res) => (res?.value ? JSON.parse(res.value) : conteosMesas)).catch(() => conteosMesas);
+      const existing = current.find((item) => item.mesa.toString().toLowerCase() === mesaClean.toLowerCase());
+      const saved = { ...conteo, id: existing?.id || uid() };
+      const updated = existing ? current.map((item) => (item.id === existing.id ? saved : item)) : [saved, ...current];
+      if (isFirebaseConfigured) {
+        await setDoc(doc(conteosMesasCollection, saved.id), saved);
+      } else {
+        await window.storage.set("conteo_mesas", JSON.stringify(updated), true);
+      }
+      setConteosMesas(updated);
+      resetMesaForm();
+      setMesaMsg(existing ? "✓ Conteo de mesa actualizado." : "✓ Conteo de mesa guardado.");
+      setLastSync(new Date());
+    } catch (error_) {
+      console.error("Save conteo mesa error:", error_);
+      setMesaMsg("No se pudo guardar el conteo de la mesa.");
+    } finally {
+      setSavingMesa(false);
+    }
+  };
+
+  const editConteoMesa = (conteo) => {
+    setMesa(conteo.mesa);
+    setLocalMesa(conteo.local || "");
+    setElectoresMesa(String(conteo.electores || ""));
+    setVotosMesa(Object.fromEntries(PARTIDOS.map(({ id }) => [id, String(conteo.votos?.[id] || "")] )));
+    setBlancosMesa(String(conteo.blancos || ""));
+    setNulosMesa(String(conteo.nulos || ""));
+    setImpugnadosMesa(String(conteo.impugnados || ""));
+    setMesaMsg("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const removeConteoMesa = async (id) => {
+    try {
+      if (isFirebaseConfigured) {
+        await deleteDoc(doc(conteosMesasCollection, id));
+      } else {
+        const fresh = await window.storage.get("conteo_mesas", true).catch(() => null);
+        const current = fresh?.value ? JSON.parse(fresh.value) : conteosMesas;
+        await window.storage.set("conteo_mesas", JSON.stringify(current.filter((item) => item.id !== id)), true);
+      }
+      setConteosMesas((current) => current.filter((item) => item.id !== id));
+    } catch (error_) {
+      console.warn("Delete conteo mesa error:", error_);
+      setMesaMsg("No se pudo eliminar el conteo.");
     }
   };
 
@@ -630,6 +764,87 @@ export default function ConteoVotoSeguro() {
               <div className="vs-stat-label">Última sincronización</div>
               <strong>{lastSync ? lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</strong>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 24px 0" }}>
+        <div className="vs-panel">
+          <div className="vs-section-title">Conteo oficial por mesa</div>
+          <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4, marginBottom: 16 }}>
+            Registra los resultados de cada acta. Si vuelves a ingresar una mesa, su conteo se actualizará.
+          </div>
+          <form onSubmit={saveConteoMesa}>
+            <div className="vs-toolbar" style={{ alignItems: "end" }}>
+              <div>
+                <label htmlFor="conteo-mesa" style={labelStyle}>N.° de mesa</label>
+                <input id="conteo-mesa" className="vs-input" value={mesa} onChange={(e) => setMesa(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Ej. 012345" inputMode="numeric" />
+              </div>
+              <div style={{ flex: "1 1 240px" }}>
+                <label htmlFor="conteo-local" style={labelStyle}>Local de votación</label>
+                <input id="conteo-local" className="vs-input" value={localMesa} onChange={(e) => setLocalMesa(e.target.value)} placeholder="Ej. I.E. Ciudad Eten" />
+              </div>
+              <div>
+                <label htmlFor="conteo-electores" style={labelStyle}>Electores</label>
+                <input id="conteo-electores" className="vs-input" value={electoresMesa} onChange={(e) => setElectoresMesa(e.target.value.replace(/\D/g, ""))} placeholder="Total" inputMode="numeric" />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 8 }}>
+              {PARTIDOS.map(({ id, nombre: partido }) => (
+                <label key={id} style={{ fontSize: 12.5, fontWeight: 600, color: RED }}>
+                  {partido}
+                  <input className="vs-input" style={{ marginTop: 5 }} value={votosMesa[id]} onChange={(e) => setVotosMesa((current) => ({ ...current, [id]: e.target.value.replace(/\D/g, "") }))} placeholder="0" inputMode="numeric" />
+                </label>
+              ))}
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: TEAL }}>
+                Votos blancos
+                <input className="vs-input" style={{ marginTop: 5 }} value={blancosMesa} onChange={(e) => setBlancosMesa(e.target.value.replace(/\D/g, ""))} placeholder="0" inputMode="numeric" />
+              </label>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: TEAL }}>
+                Votos nulos
+                <input className="vs-input" style={{ marginTop: 5 }} value={nulosMesa} onChange={(e) => setNulosMesa(e.target.value.replace(/\D/g, ""))} placeholder="0" inputMode="numeric" />
+              </label>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: TEAL }}>
+                Impugnados
+                <input className="vs-input" style={{ marginTop: 5 }} value={impugnadosMesa} onChange={(e) => setImpugnadosMesa(e.target.value.replace(/\D/g, ""))} placeholder="0" inputMode="numeric" />
+              </label>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13 }}>Total contabilizado: <b>{totalConteo({ votos: votosMesa, blancos: blancosMesa, nulos: nulosMesa, impugnados: impugnadosMesa })}</b></span>
+              <button className="vs-btn vs-btn--primary" type="submit" disabled={savingMesa}>{savingMesa ? "Guardando…" : "Guardar conteo de mesa"}</button>
+            </div>
+            {mesaMsg && <div style={{ marginTop: 10, fontSize: 13, color: mesaMsg.startsWith("✓") ? TEAL : RED_BRIGHT }}>{mesaMsg}</div>}
+          </form>
+        </div>
+
+        <div className="vs-panel" style={{ marginTop: 20 }}>
+          <div className="vs-section-title">Mesas registradas ({conteosMesas.length})</div>
+          <div style={{ overflowX: "auto", marginTop: 10 }}>
+            <table className="vs-table">
+              <thead>
+                <tr><th>Mesa</th><th>Local</th><th>Electores</th>{PARTIDOS.map(({ id, nombre: partido }) => <th key={id}>{partido}</th>)}<th>Blancos</th><th>Nulos</th><th>Total</th><th></th></tr>
+              </thead>
+              <tbody>
+                {conteosMesas.slice().sort((a, b) => Number(a.mesa) - Number(b.mesa)).map((conteo) => (
+                  <tr key={conteo.id}>
+                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600 }}>{conteo.mesa}</td>
+                    <td>{conteo.local}</td>
+                    <td>{conteo.electores || 0}</td>
+                    {PARTIDOS.map(({ id }) => <td key={id}>{conteo.votos?.[id] || 0}</td>)}
+                    <td>{conteo.blancos || 0}</td>
+                    <td>{conteo.nulos || 0}</td>
+                    <td style={{ fontWeight: 700 }}>{totalConteo(conteo)}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button onClick={() => editConteoMesa(conteo)} type="button" style={{ border: "none", background: "none", color: TEAL, cursor: "pointer", fontSize: 12, marginRight: 8 }}>Editar</button>
+                      <button onClick={() => removeConteoMesa(conteo.id)} type="button" style={{ border: "none", background: "none", color: RED_BRIGHT, cursor: "pointer", fontSize: 12 }}>Eliminar</button>
+                    </td>
+                  </tr>
+                ))}
+                {conteosMesas.length === 0 && <tr><td colSpan={PARTIDOS.length + 7} style={{ textAlign: "center", opacity: 0.5, padding: "24px 0" }}>Aún no hay mesas registradas.</td></tr>}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
