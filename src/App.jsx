@@ -62,6 +62,56 @@ function parseActaText(text) {
   return { mesa, votos, blancos, nulos, impugnados, electores };
 }
 
+async function loadActaCanvas(file, scale = 2) {
+  const image = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width * scale;
+  canvas.height = image.height * scale;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+  return canvas;
+}
+
+function enhanceActaCanvas(source, crop) {
+  const x = Math.round(source.width * crop.x);
+  const y = Math.round(source.height * crop.y);
+  const width = Math.round(source.width * crop.width);
+  const height = Math.round(source.height * crop.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(source, x, y, width, height, 0, 0, width, height);
+  const pixels = context.getImageData(0, 0, width, height);
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const gray = pixels.data[index] * 0.299 + pixels.data[index + 1] * 0.587 + pixels.data[index + 2] * 0.114;
+    const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.55 + 128));
+    pixels.data[index] = contrast;
+    pixels.data[index + 1] = contrast;
+    pixels.data[index + 2] = contrast;
+  }
+  context.putImageData(pixels, 0, 0);
+  return canvas;
+}
+
+async function recognizeVoteRows(worker, source) {
+  const rowCenters = [0.346, 0.421, 0.495, 0.569, 0.643, 0.717];
+  const rowHeight = 0.06;
+  const values = [];
+  await worker.setParameters({
+    tessedit_char_whitelist: "0123456789",
+    tessedit_pageseg_mode: "8",
+  });
+  for (const center of rowCenters) {
+    const crop = enhanceActaCanvas(source, { x: 0.65, y: center - rowHeight / 2, width: 0.2, height: rowHeight });
+    const result = await worker.recognize(crop);
+    const value = result.data.text.match(/\d{1,4}/)?.[0] || "";
+    values.push(value);
+  }
+  return values;
+}
+
 function uid() {
   if (typeof crypto !== "undefined") {
     if (typeof crypto.randomUUID === "function") {
@@ -496,17 +546,23 @@ export default function ConteoVotoSeguro() {
     if (!file) return;
     setReadingActa(true);
     setOcrMsg("Preparando lectura de la foto…");
+    let worker;
     try {
-      const worker = await createWorker("spa", 1, {
+      worker = await createWorker("spa", 1, {
         logger: (message) => {
           if (message.status === "recognizing text") {
             setOcrMsg(`Leyendo acta… ${Math.round(message.progress * 100)}%`);
           }
         },
       });
-      const result = await worker.recognize(file);
-      await worker.terminate();
+      const source = await loadActaCanvas(file);
+      await worker.setParameters({ tessedit_pageseg_mode: "6", tessedit_char_whitelist: "" });
+      const result = await worker.recognize(enhanceActaCanvas(source, { x: 0, y: 0, width: 1, height: 1 }));
       const extracted = parseActaText(result.data.text);
+      const rowValues = await recognizeVoteRows(worker, source);
+      PARTIDOS.forEach(({ id }, index) => {
+        if (rowValues[index]) extracted.votos[id] = rowValues[index];
+      });
       const detectedFields = Object.keys(extracted.votos).length + [extracted.mesa, extracted.blancos, extracted.nulos, extracted.impugnados, extracted.electores].filter(Boolean).length;
       if (extracted.mesa) setMesa(extracted.mesa);
       if (Object.keys(extracted.votos).length) setVotosMesa((current) => ({ ...current, ...extracted.votos }));
@@ -519,6 +575,7 @@ export default function ConteoVotoSeguro() {
       console.error("OCR acta error:", error_);
       setOcrMsg("No se pudo leer la foto. Verifica la conexión y vuelve a intentarlo.");
     } finally {
+      if (worker) await worker.terminate();
       setReadingActa(false);
     }
   };
