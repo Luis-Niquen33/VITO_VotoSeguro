@@ -2,6 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { collection, query as firestoreQuery, orderBy, onSnapshot, getDocs, setDoc, deleteDoc, doc } from "firebase/firestore";
 import { createWorker } from "tesseract.js";
 import { db, isFirebaseConfigured } from "./firebase";
+import logoApra from "./assets/logo-apra.svg";
+import logoAlianza from "./assets/logo-alianza.svg";
+import logoPpt from "./assets/logo-ppt.svg";
+import logoRenovacion from "./assets/logo-renovacion.svg";
+import logoFuerza from "./assets/logo-fuerza.svg";
+import logoAvanza from "./assets/logo-avanza.svg";
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -18,12 +24,12 @@ const RULE = "#D8C9B8";
 const TOTAL_MESAS = 34;
 
 const PARTIDOS = [
-  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "K", candidato: "Jenner Chafloque", color: "#F0A323", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Fuerza%20Popular%20logo.svg?width=96" },
-  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "APRA", candidato: "Marlon Ñiquen Torres", color: "#B5282D", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/APRA%20logo.svg?width=96" },
-  { id: "alianza-para-el-progreso", nombre: "Alianza para el Progreso", sigla: "A", candidato: "Marcos Nunton", color: "#1769A8", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Alianza%20para%20el%20Progreso%20logo.svg?width=160" },
-  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "R", candidato: "Jorge Llumpo", color: "#079BD3", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Renovaci%C3%B3n%20Popular%20logo.svg?width=160" },
-  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", candidato: "Elmer Angeles", color: "#F1B900", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Pa%C3%ADs%20para%20Todos%20logo.svg?width=160" },
-  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", candidato: "Eddie Salazar", color: "#28458F", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Avanza%20Pa%C3%ADs%20Logo%202017-20.jpg?width=160" },
+  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "K", candidato: "Jenner Chafloque", color: "#F0A323", logoUrl: logoFuerza },
+  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "APRA", candidato: "Marlon Ñiquen Torres", color: "#B5282D", logoUrl: logoApra },
+  { id: "alianza-para-el-progreso", nombre: "Alianza para el Progreso", sigla: "A", candidato: "Marcos Nunton", color: "#1769A8", logoUrl: logoAlianza },
+  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "R", candidato: "Jorge Llumpo", color: "#079BD3", logoUrl: logoRenovacion },
+  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", candidato: "Elmer Angeles", color: "#F1B900", logoUrl: logoPpt },
+  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", candidato: "Eddie Salazar", color: "#28458F", logoUrl: logoAvanza },
 ];
 
 function emptyVotos() {
