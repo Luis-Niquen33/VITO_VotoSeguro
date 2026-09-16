@@ -18,12 +18,12 @@ const RULE = "#D8C9B8";
 const TOTAL_MESAS = 34;
 
 const PARTIDOS = [
-  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "FP", color: "#F0A323", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Fuerza%20Popular%20logo.svg?width=96" },
-  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "PAP", color: "#B5282D", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/APRA%20logo.svg?width=96" },
-  { id: "alianza-para-el-progreso", nombre: "Alianza para el Progreso", sigla: "APP", color: "#1769A8", logoUrl: "" },
-  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Renovaci%C3%B3n%20Popular%20logo.svg?width=96" },
-  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", color: "#2F8B67", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Pa%C3%ADs%20para%20Todos%20logo.svg?width=96" },
-  { id: "el-tren", nombre: "El Tren", sigla: "ET", color: "#4B83B5", logoUrl: "" },
+  { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "K", candidato: "Jenner Chafloque", color: "#F0A323", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Fuerza%20Popular%20logo.svg?width=96" },
+  { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "APRA", candidato: "Marlon Ñiquen Torres", color: "#B5282D", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/APRA%20logo.svg?width=96" },
+  { id: "alianza-para-el-progreso", nombre: "Alianza para el Progreso", sigla: "A", candidato: "Marcos Nunton", color: "#1769A8", logoUrl: "" },
+  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "R", candidato: "Jorge Llumpo", color: "#079BD3", logoUrl: "" },
+  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", candidato: "Elmer Angeles", color: "#F1B900", logoUrl: "" },
+  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", candidato: "Eddie Salazar", color: "#28458F", logoUrl: "" },
 ];
 
 function emptyVotos() {
@@ -32,6 +32,10 @@ function emptyVotos() {
 
 function totalConteo(conteo) {
   return PARTIDOS.reduce((total, { id }) => total + (Number(conteo.votos?.[id]) || 0), 0) + (Number(conteo.blancos) || 0) + (Number(conteo.nulos) || 0) + (Number(conteo.impugnados) || 0);
+}
+
+function partidoLabel(partido) {
+  return partido.candidato ? `${partido.nombre} - ${partido.candidato}` : partido.nombre;
 }
 
 function firstNumberAfterLabel(lines, labels) {
@@ -140,8 +144,8 @@ function ProgressBar({ count, max, color = RED }) {
 function PartidoLogo({ partido, size = 48 }) {
   return (
     <div
-      aria-label={`Logo de ${partido.nombre}`}
-      title={partido.nombre}
+      aria-label={`Logo de ${partidoLabel(partido)}`}
+      title={partidoLabel(partido)}
       style={{
         width: size,
         height: size,
@@ -1034,7 +1038,7 @@ export default function ConteoVotoSeguro() {
                     <PartidoLogo partido={partido} size={index === 0 ? 54 : 46} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: index === 0 ? GOLD : "rgba(255,255,255,0.65)", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, textTransform: "uppercase" }}>{index + 1}.° lugar</div>
-                      <div style={{ fontWeight: 600, fontSize: 14, marginTop: 3 }}>{partido.nombre}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginTop: 3 }}>{partidoLabel(partido)}</div>
                       <strong style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 20 }}>{partido.votos.toLocaleString()}</strong>
                       <span style={{ fontSize: 12, opacity: 0.72, marginLeft: 6 }}>{percentage.toFixed(1)}%</span>
                     </div>
@@ -1058,7 +1062,7 @@ export default function ConteoVotoSeguro() {
                   <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, color: index === 0 && partido.votos > 0 ? RED : "#9A8A7A", textAlign: "center" }}>{index + 1}</span>
                   <PartidoLogo partido={partido} size={38} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{partido.nombre}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{partidoLabel(partido)}</div>
                     <div style={{ height: 7, marginTop: 6, background: "#EEE3D3", borderRadius: 5, overflow: "hidden" }}><div style={{ width: `${percentage}%`, minWidth: partido.votos > 0 ? 5 : 0, height: "100%", background: partido.color, borderRadius: 5 }} /></div>
                   </div>
                   <strong style={{ fontFamily: "'IBM Plex Mono', monospace", textAlign: "right" }}>{partido.votos.toLocaleString()}</strong>
@@ -1106,10 +1110,10 @@ export default function ConteoVotoSeguro() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 8 }}>
-              {PARTIDOS.map(({ id, nombre: partido }) => (
-                <label key={id} style={{ fontSize: 12.5, fontWeight: 600, color: RED }}>
-                  {partido}
-                  <input className="vs-input" style={{ marginTop: 5 }} value={votosMesa[id]} onChange={(e) => setVotosMesa((current) => ({ ...current, [id]: e.target.value.replace(/\D/g, "") }))} placeholder="0" inputMode="numeric" />
+              {PARTIDOS.map((partido) => (
+                <label key={partido.id} style={{ fontSize: 12.5, fontWeight: 600, color: RED }}>
+                  {partidoLabel(partido)}
+                  <input className="vs-input" style={{ marginTop: 5 }} value={votosMesa[partido.id]} onChange={(e) => setVotosMesa((current) => ({ ...current, [partido.id]: e.target.value.replace(/\D/g, "") }))} placeholder="0" inputMode="numeric" />
                 </label>
               ))}
               <label style={{ fontSize: 12.5, fontWeight: 600, color: TEAL }}>
@@ -1139,7 +1143,7 @@ export default function ConteoVotoSeguro() {
           <div style={{ overflowX: "auto", marginTop: 10 }}>
             <table className="vs-table">
               <thead>
-                <tr><th>Mesa</th><th>Local</th><th>Electores</th>{PARTIDOS.map(({ id, nombre: partido }) => <th key={id}>{partido}</th>)}<th>Blancos</th><th>Nulos</th><th>Total</th><th>Acciones</th></tr>
+                <tr><th>Mesa</th><th>Local</th><th>Electores</th>{PARTIDOS.map((partido) => <th key={partido.id}>{partidoLabel(partido)}</th>)}<th>Blancos</th><th>Nulos</th><th>Total</th><th>Acciones</th></tr>
               </thead>
               <tbody>
                 {conteosMesas.slice().sort((a, b) => Number(a.mesa) - Number(b.mesa)).map((conteo) => (
