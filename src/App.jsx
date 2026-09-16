@@ -18,12 +18,12 @@ const RULE = "#D8C9B8";
 const TOTAL_MESAS = 34;
 
 const PARTIDOS = [
-  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Renovaci%C3%B3n%20Popular%20logo.svg?width=96" },
   { id: "fuerza-popular", nombre: "Fuerza Popular", sigla: "FP", color: "#F0A323", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Fuerza%20Popular%20logo.svg?width=96" },
-  { id: "avanza-pais", nombre: "Avanza País", sigla: "AP", color: "#1769A8", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Avanza%20Pa%C3%ADs%20Logo%202017-20.jpg?width=96" },
-  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", color: "#2F8B67", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Pa%C3%ADs%20para%20Todos%20logo.svg?width=96" },
-  { id: "somos-peru", nombre: "Somos Perú", sigla: "SP", color: "#6A4AA1", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Somos%20Per%C3%BA%20logo.svg?width=96" },
   { id: "partido-aprista-peruano", nombre: "Partido Aprista Peruano", sigla: "PAP", color: "#B5282D", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/APRA%20logo.svg?width=96" },
+  { id: "alianza-para-el-progreso", nombre: "Alianza para el Progreso", sigla: "APP", color: "#1769A8", logoUrl: "" },
+  { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", color: "#D33A32", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Renovaci%C3%B3n%20Popular%20logo.svg?width=96" },
+  { id: "pais-para-todos", nombre: "País para Todos", sigla: "PPT", color: "#2F8B67", logoUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Pa%C3%ADs%20para%20Todos%20logo.svg?width=96" },
+  { id: "el-tren", nombre: "El Tren", sigla: "ET", color: "#4B83B5", logoUrl: "" },
 ];
 
 function emptyVotos() {
@@ -54,11 +54,12 @@ function parseActaText(text) {
     const value = firstNumberAfterLabel(lines, [nombre, sigla]);
     if (value) votos[id] = value;
   });
-  const mesa = firstNumberAfterLabel(lines, ["mesa", "n. de mesa", "numero de mesa"]);
+  const mesa = firstNumberAfterLabel(lines, ["mesa de sufragio", "mesa", "n. de mesa", "numero de mesa"]);
   const blancos = firstNumberAfterLabel(lines, ["votos blancos", "blancos"]);
   const nulos = firstNumberAfterLabel(lines, ["votos nulos", "nulos"]);
   const impugnados = firstNumberAfterLabel(lines, ["votos impugnados", "impugnados"]);
-  return { mesa, votos, blancos, nulos, impugnados };
+  const electores = firstNumberAfterLabel(lines, ["total de electores habiles", "electores habiles"]);
+  return { mesa, votos, blancos, nulos, impugnados, electores };
 }
 
 function uid() {
@@ -506,12 +507,13 @@ export default function ConteoVotoSeguro() {
       const result = await worker.recognize(file);
       await worker.terminate();
       const extracted = parseActaText(result.data.text);
-      const detectedFields = Object.keys(extracted.votos).length + [extracted.mesa, extracted.blancos, extracted.nulos, extracted.impugnados].filter(Boolean).length;
+      const detectedFields = Object.keys(extracted.votos).length + [extracted.mesa, extracted.blancos, extracted.nulos, extracted.impugnados, extracted.electores].filter(Boolean).length;
       if (extracted.mesa) setMesa(extracted.mesa);
       if (Object.keys(extracted.votos).length) setVotosMesa((current) => ({ ...current, ...extracted.votos }));
       if (extracted.blancos) setBlancosMesa(extracted.blancos);
       if (extracted.nulos) setNulosMesa(extracted.nulos);
       if (extracted.impugnados) setImpugnadosMesa(extracted.impugnados);
+      if (extracted.electores) setElectoresMesa(extracted.electores);
       setOcrMsg(detectedFields ? `✓ Se detectaron ${detectedFields} valores. Revísalos antes de guardar.` : "No se detectaron números. Toma una foto más nítida y con el acta completa.");
     } catch (error_) {
       console.error("OCR acta error:", error_);
@@ -531,7 +533,7 @@ export default function ConteoVotoSeguro() {
       return;
     }
     const toCount = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
-    const totalElectores = totalConteo({ votos: votosMesa, blancos: blancosMesa, nulos: nulosMesa, impugnados: impugnadosMesa });
+    const totalElectores = toCount(electoresMesa);
     const conteo = {
       mesa: mesaClean,
       local: localMesa.trim() || "Sin local registrado",
@@ -1041,8 +1043,8 @@ export default function ConteoVotoSeguro() {
                 <input id="conteo-local" className="vs-input" value={localMesa} onChange={(e) => setLocalMesa(e.target.value)} placeholder="Ej. I.E. Ciudad Eten" />
               </div>
               <div>
-                <label htmlFor="conteo-electores" style={labelStyle}>Electores</label>
-                <input id="conteo-electores" className="vs-input" value={totalConteo({ votos: votosMesa, blancos: blancosMesa, nulos: nulosMesa, impugnados: impugnadosMesa })} placeholder="Se calcula automáticamente" inputMode="numeric" readOnly style={{ background: "#F2ECE0", color: TEAL, fontWeight: 700 }} />
+                <label htmlFor="conteo-electores" style={labelStyle}>Electores hábiles</label>
+                <input id="conteo-electores" className="vs-input" value={electoresMesa} onChange={(e) => setElectoresMesa(e.target.value.replace(/\D/g, ""))} placeholder="Según el acta" inputMode="numeric" style={{ background: "#F2ECE0", color: TEAL, fontWeight: 700 }} />
               </div>
             </div>
 
