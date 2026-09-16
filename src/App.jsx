@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { collection, query as firestoreQuery, orderBy, onSnapshot, getDocs, setDoc, deleteDoc, doc } from "firebase/firestore";
+import { createWorker } from "tesseract.js";
 import { db, isFirebaseConfigured } from "./firebase";
 
 const FONTS = `
@@ -31,6 +32,33 @@ function emptyVotos() {
 
 function totalConteo(conteo) {
   return PARTIDOS.reduce((total, { id }) => total + (Number(conteo.votos?.[id]) || 0), 0) + (Number(conteo.blancos) || 0) + (Number(conteo.nulos) || 0) + (Number(conteo.impugnados) || 0);
+}
+
+function firstNumberAfterLabel(lines, labels) {
+  const normalizedLabels = labels.map(normalizeText);
+  const lineIndex = lines.findIndex((line) => normalizedLabels.some((label) => line.includes(label)));
+  if (lineIndex < 0) return "";
+  const sameLineNumber = lines[lineIndex].match(/\d{1,5}/);
+  if (sameLineNumber) return sameLineNumber[0];
+  const nextLineNumber = lines[lineIndex + 1]?.match(/^\D*(\d{1,5})\D*$/);
+  return nextLineNumber?.[1] || "";
+}
+
+function parseActaText(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => normalizeText(line))
+    .filter(Boolean);
+  const votos = {};
+  PARTIDOS.forEach(({ id, nombre, sigla }) => {
+    const value = firstNumberAfterLabel(lines, [nombre, sigla]);
+    if (value) votos[id] = value;
+  });
+  const mesa = firstNumberAfterLabel(lines, ["mesa", "n. de mesa", "numero de mesa"]);
+  const blancos = firstNumberAfterLabel(lines, ["votos blancos", "blancos"]);
+  const nulos = firstNumberAfterLabel(lines, ["votos nulos", "nulos"]);
+  const impugnados = firstNumberAfterLabel(lines, ["votos impugnados", "impugnados"]);
+  return { mesa, votos, blancos, nulos, impugnados };
 }
 
 function uid() {
@@ -206,6 +234,8 @@ export default function ConteoVotoSeguro() {
   const [impugnadosMesa, setImpugnadosMesa] = useState("");
   const [mesaMsg, setMesaMsg] = useState("");
   const [savingMesa, setSavingMesa] = useState(false);
+  const [readingActa, setReadingActa] = useState(false);
+  const [ocrMsg, setOcrMsg] = useState("");
 
   // Panel de gestión de usuarios (admin)
   const [nuevoUsuario, setNuevoUsuario] = useState("");
@@ -457,6 +487,38 @@ export default function ConteoVotoSeguro() {
     setBlancosMesa("");
     setNulosMesa("");
     setImpugnadosMesa("");
+  };
+
+  const readActaPhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setReadingActa(true);
+    setOcrMsg("Preparando lectura de la foto…");
+    try {
+      const worker = await createWorker("spa", 1, {
+        logger: (message) => {
+          if (message.status === "recognizing text") {
+            setOcrMsg(`Leyendo acta… ${Math.round(message.progress * 100)}%`);
+          }
+        },
+      });
+      const result = await worker.recognize(file);
+      await worker.terminate();
+      const extracted = parseActaText(result.data.text);
+      const detectedFields = Object.keys(extracted.votos).length + [extracted.mesa, extracted.blancos, extracted.nulos, extracted.impugnados].filter(Boolean).length;
+      if (extracted.mesa) setMesa(extracted.mesa);
+      if (Object.keys(extracted.votos).length) setVotosMesa((current) => ({ ...current, ...extracted.votos }));
+      if (extracted.blancos) setBlancosMesa(extracted.blancos);
+      if (extracted.nulos) setNulosMesa(extracted.nulos);
+      if (extracted.impugnados) setImpugnadosMesa(extracted.impugnados);
+      setOcrMsg(detectedFields ? `✓ Se detectaron ${detectedFields} valores. Revísalos antes de guardar.` : "No se detectaron números. Toma una foto más nítida y con el acta completa.");
+    } catch (error_) {
+      console.error("OCR acta error:", error_);
+      setOcrMsg("No se pudo leer la foto. Verifica la conexión y vuelve a intentarlo.");
+    } finally {
+      setReadingActa(false);
+    }
   };
 
   const saveConteoMesa = async (e) => {
@@ -955,10 +1017,19 @@ export default function ConteoVotoSeguro() {
         </div>
 
         <div className="vs-panel">
-          <div className="vs-section-title">Conteo oficial por mesa</div>
-          <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4, marginBottom: 16 }}>
-            Registra los resultados de cada acta. Si vuelves a ingresar una mesa, su conteo se actualizará.
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div className="vs-section-title">Conteo oficial por mesa</div>
+              <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4 }}>
+                Registra los resultados de cada acta. Si vuelves a ingresar una mesa, su conteo se actualizará.
+              </div>
+            </div>
+            <label className="vs-btn vs-btn--ghost" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: readingActa ? "wait" : "pointer", opacity: readingActa ? 0.65 : 1 }}>
+              {readingActa ? "Leyendo foto…" : "📷 Tomar foto del acta"}
+              <input type="file" accept="image/*" capture="environment" onChange={readActaPhoto} disabled={readingActa} style={{ display: "none" }} />
+            </label>
           </div>
+          {ocrMsg && <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: ocrMsg.startsWith("✓") ? "#E6F4EE" : "#FFF5E7", color: ocrMsg.startsWith("✓") ? TEAL : "#76501B", fontSize: 13 }}>{ocrMsg}</div>}
           <form onSubmit={saveConteoMesa}>
             <div className="vs-toolbar" style={{ alignItems: "end" }}>
               <div>
