@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="16" fill="#ffca05"/><path fill="#333" d="M22 10h56c-2 18-12 25-27 29 11 12 19 25 29 45H61L42 55v29H22z"/><path fill="#ffca05" d="M40 29c8-2 16-5 20-13H40z"/><text x="50" y="96" fill="#333" font-family="Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle">PAIS PARA TODOS</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="10" fill="#f4c400"/>
+  <path d="M11 28 C 21 17, 35 13, 49 13 C 61 13, 75 18, 84 29 L 84 54 C 76 52, 67 52, 58 55 C 44 58, 31 66, 18 74 L 11 28 Z" fill="#2b2b2b"/>
+  <path d="M18 27 C 28 33, 38 41, 46 55 C 53 68, 60 77, 74 83 L 84 84 C 74 92, 62 95, 49 95 C 34 95, 18 89, 11 78 L 18 27 Z" fill="#2b2b2b"/>
+  <path d="M26 54 C 34 44, 42 38, 57 30" fill="none" stroke="#f4c400" stroke-width="3.3" stroke-linecap="round"/>
+  <path d="M42 70 C 54 64, 65 59, 76 52" fill="none" stroke="#f4c400" stroke-width="3.3" stroke-linecap="round"/>
+  <path d="M18 79 C 30 70, 37 64, 45 58" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M52 83 C 62 75, 70 68, 76 60" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <text x="50" y="92" fill="#2b2b2b" font-family="Arial, Helvetica, sans-serif" font-size="8.5" font-weight="700" text-anchor="middle">PAÍS PARA TODOS</text>
+</svg>
