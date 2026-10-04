@@ -940,8 +940,14 @@ export default function ConteoVotoSeguro() {
     return { registradas, pendientes, avance, electores, actasConElectores, mesaEnCurso };
   }, [conteosMesas, mesa, electoresMesa]);
 
-  const opcionesFiltroMesa = useMemo(() => [...new Set(conteosMesas.map((conteo) => String(conteo.mesa || "").trim()).filter(Boolean))].sort((a, b) => Number(a) - Number(b)), [conteosMesas]);
-  const opcionesFiltroLocal = useMemo(() => [...new Set(conteosMesas.map((conteo) => (conteo.local || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")), [conteosMesas]);
+  const opcionesFiltroMesa = useMemo(() => [...new Set([
+    ...CATALOGO_MESAS.map((item) => item.numero),
+    ...conteosMesas.map((conteo) => String(conteo.mesa || "").trim()),
+  ].filter(Boolean))].sort((a, b) => Number(a) - Number(b)), [conteosMesas]);
+  const opcionesFiltroLocal = useMemo(() => [...new Set([
+    ...CATALOGO_MESAS.map((item) => item.local),
+    ...conteosMesas.map((conteo) => (conteo.local || "").trim()),
+  ].filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")), [conteosMesas]);
   const opcionesFiltroPersonero = useMemo(() => [...new Set(conteosMesas.map((conteo) => (conteo.responsable || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")), [conteosMesas]);
 
   const mesasFiltradas = useMemo(() => {
@@ -1311,9 +1317,13 @@ export default function ConteoVotoSeguro() {
               <div className="vs-section-title" style={{ marginBottom: 14 }}>Filtros</div>
 
               <label htmlFor="filtro-mesa" style={labelStyle}>N.° de mesas</label>
-              <select id="filtro-mesa" className="vs-input" value={mesaFilter} onChange={(e) => setMesaFilter(e.target.value)}>
+              <select id="filtro-mesa" className="vs-input" value={mesaFilter} onChange={(e) => { setMesaFilter(e.target.value); if (e.target.value) updateMesaNumber(e.target.value); }}>
                 <option value="">Todas las mesas</option>
-                {opcionesFiltroMesa.map((opcion) => <option key={opcion} value={opcion}>{opcion}</option>)}
+                {opcionesFiltroMesa.map((opcion) => {
+                  const datosMesa = buscarMesaCatalogada(opcion);
+                  const etiqueta = datosMesa ? `${opcion} · ${datosMesa.local} · ${datosMesa.electores} electores hábiles` : opcion;
+                  return <option key={opcion} value={opcion}>{etiqueta}</option>;
+                })}
               </select>
 
               <label htmlFor="filtro-local" style={labelStyle}>Local de votación</label>
