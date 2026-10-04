@@ -326,9 +326,9 @@ export default function ConteoVotoSeguro() {
   const [nuevoRol, setNuevoRol] = useState("promotor");
   const [userMsg, setUserMsg] = useState("");
 
-  const registrosCollection = db ? collection(db, "registros") : null;
-  const usuariosCollection = db ? collection(db, "usuarios") : null;
-  const conteosMesasCollection = db ? collection(db, "conteo_mesas") : null;
+  const registrosCollection = useMemo(() => (db ? collection(db, "registros") : null), []);
+  const usuariosCollection = useMemo(() => (db ? collection(db, "usuarios") : null), []);
+  const conteosMesasCollection = useMemo(() => (db ? collection(db, "conteo_mesas") : null), []);
 
   const copyPublicResultsLink = async () => {
     const publicUrl = new URL(window.location.href);
