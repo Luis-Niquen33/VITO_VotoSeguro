@@ -22,6 +22,21 @@ const GOLD = "#D9A441";
 const TEAL = "#347765";
 const RULE = "#D5E0DB";
 const TOTAL_MESAS = 34;
+const CATALOGO_MESAS = Array.from({ length: TOTAL_MESAS }, (_, index) => {
+  const numero = 33162 + index;
+  const local = numero <= 33167
+    ? "IE 11028 CESAR FRANCISCO PINGLO CHUNGA"
+    : numero <= 33181
+      ? "IE 11027 DIVINO NIÑO DEL MILAGRO"
+      : "IE PEDRO RUIZ GALLO CIUDAD ETEN";
+  const electores = numero <= 33181 ? 300 : numero <= 33192 || numero === 33195 ? 295 : 296;
+  return { numero: String(numero).padStart(6, "0"), local, electores };
+});
+
+function buscarMesaCatalogada(value) {
+  const numero = String(value || "").replace(/\D/g, "").padStart(6, "0");
+  return CATALOGO_MESAS.find((item) => item.numero === numero);
+}
 
 const PARTIDOS = [
   { id: "renovacion-popular", nombre: "Renovación Popular", sigla: "RP", candidato: "Koki Llumpo", color: "#079BD3", logoUrl: logoRenovacion },
@@ -593,6 +608,14 @@ export default function ConteoVotoSeguro() {
     setImpugnadosMesa("");
   };
 
+  const updateMesaNumber = (value) => {
+    const mesaValue = value.replace(/\D/g, "").slice(0, 8);
+    const datosMesa = buscarMesaCatalogada(mesaValue);
+    setMesa(datosMesa?.numero || mesaValue);
+    setLocalMesa(datosMesa?.local || "");
+    setElectoresMesa(datosMesa ? String(datosMesa.electores) : "");
+  };
+
   const readActaPhoto = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -617,7 +640,7 @@ export default function ConteoVotoSeguro() {
         if (rowValues[index]) extracted.votos[id] = rowValues[index];
       });
       const detectedFields = Object.keys(extracted.votos).length + [extracted.mesa, extracted.blancos, extracted.nulos, extracted.impugnados, extracted.electores].filter(Boolean).length;
-      if (extracted.mesa) setMesa(extracted.mesa);
+      if (extracted.mesa) updateMesaNumber(extracted.mesa);
       if (Object.keys(extracted.votos).length) setVotosMesa((current) => ({ ...current, ...extracted.votos }));
       if (extracted.blancos) setBlancosMesa(extracted.blancos);
       if (extracted.nulos) setNulosMesa(extracted.nulos);
@@ -1337,7 +1360,10 @@ export default function ConteoVotoSeguro() {
                     <tr>
                       <td style={{ padding: "0 8px 12px 0", width: "25%" }}>
                         <label htmlFor="conteo-mesa" style={labelStyle}>N.° de mesa</label>
-                        <input id="conteo-mesa" className="vs-input" value={mesa} onChange={(e) => setMesa(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Ej. 012345" inputMode="numeric" />
+                        <input id="conteo-mesa" className="vs-input" list="mesas-catalogo" value={mesa} onChange={(e) => updateMesaNumber(e.target.value)} placeholder="Ej. 033162" inputMode="numeric" />
+                        <datalist id="mesas-catalogo">
+                          {CATALOGO_MESAS.map((item) => <option key={item.numero} value={item.numero}>{item.local} · {item.electores} electores hábiles</option>)}
+                        </datalist>
                       </td>
                       <td style={{ padding: "0 8px 12px 0", width: "25%" }}>
                         <label htmlFor="conteo-local" style={labelStyle}>Local de votación</label>
