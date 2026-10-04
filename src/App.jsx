@@ -685,17 +685,25 @@ export default function ConteoVotoSeguro() {
     setSavingMesa(true);
     try {
       const current = isFirebaseConfigured
-        ? conteosMesas
+        ? (await getDocs(firestoreQuery(conteosMesasCollection, orderBy("ts", "desc")))).docs.map((item) => ({ id: item.id, ...item.data() }))
         : await window.storage.get("conteo_mesas", true).then((res) => (res?.value ? JSON.parse(res.value) : conteosMesas)).catch(() => conteosMesas);
-      const existing = current.find((item) => item.mesa.toString().toLowerCase() === mesaClean.toLowerCase());
+      const normalizeMesa = (value) => String(value || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+      const existing = current.find((item) => normalizeMesa(item.mesa) === normalizeMesa(mesaClean));
       const saved = { ...conteo, id: existing?.id || uid() };
       const updated = existing ? current.map((item) => (item.id === existing.id ? saved : item)) : [saved, ...current];
       if (isFirebaseConfigured) {
         await setDoc(doc(conteosMesasCollection, saved.id), saved);
+        setConteosMesas(updated);
+        const confirmed = await getDocs(firestoreQuery(conteosMesasCollection, orderBy("ts", "desc")));
+        setConteosMesas(confirmed.docs.map((item) => ({ id: item.id, ...item.data() })));
       } else {
-        await window.storage.set("conteo_mesas", JSON.stringify(updated), true);
+        const result = await window.storage.set("conteo_mesas", JSON.stringify(updated), true);
+        if (!result) throw new Error("No se pudo confirmar el guardado de la mesa.");
+        setConteosMesas(updated);
       }
-      setConteosMesas(updated);
+      setMesaFilter("");
+      setLocalFilter("");
+      setPersoneroFilter("");
       resetMesaForm();
       setMesaMsg(existing ? "✓ Conteo de mesa actualizado." : "✓ Conteo de mesa guardado.");
       setLastSync(new Date());
